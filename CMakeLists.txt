@@ -10,6 +10,7 @@ add_library(gpuRIRcu STATIC
     src/gpuRIR_cuda.cu
 )
 
+SET(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -D_FORCE_INLINES")
 # SET(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -lineinfo")
 
 target_link_libraries(gpuRIRcu PRIVATE -lcurand)

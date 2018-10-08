@@ -1,8 +1,8 @@
 #include <iostream>
 #include <stdio.h>
 
-#include "/usr/local/cuda/include/cuda.h"
-#include "/usr/local/cuda/include/cuda_runtime.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <curand.h>
 
 #include <vector>
