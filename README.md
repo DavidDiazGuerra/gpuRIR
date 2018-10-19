@@ -5,13 +5,13 @@
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [License](#license)
 - [Documentation](#documentation)
-  * [`simulateRIR`](#-simulaterir-)
-  * [`beta_SabineEstimation`](#-beta-sabineestimation-)
-  * [`att2t_SabineEstimator`](#-att2t-sabineestimator-)
-  * [`t2n`](#-t2n-)
+  * [`simulateRIR`](#simulaterir)
+  * [`beta_SabineEstimation`](#beta_sabineestimation)
+  * [`att2t_SabineEstimator`](#att2t_sabineestimator)
+  * [`t2n`](#t2n)
 - [References](#references)
-
 
 
 ## Prerequisites
@@ -24,18 +24,21 @@
 
 * **Python**: It has been tested in Python 3, but should work fine with Python 2.
 
-## License
-
-The library is subject to AGPL-3.0 license and comes with no warranty. If you find it useful for your research work, please, acknowledge it to [1]_.
 
 ## Installation
 You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR`. You can also clone or download our repository and run `python setup.py install`.
+
+
+## License
+
+The library is subject to AGPL-3.0 license and comes with no warranty. If you find it useful for your research work, please, acknowledge it to [[1]](#references).
+
 
 ## Documentation
 
 ### `simulateRIR`
 
-Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM). For further details see [1]_.
+Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM). For further details see [[1]](#references).
 
 #### Parameters
 
@@ -109,7 +112,6 @@ Estimation of the time for the RIR to reach a certain attenuation using the Sabi
 *float.*
         Time (in seconds) to reach the desired attenuation.
 
-
 ### `t2n`
 
 Estimation of the number of images needed for a correct RIR simulation.
@@ -128,10 +130,10 @@ Estimation of the number of images needed for a correct RIR simulation.
 *3 elements list of integers.*
         The number of images sources to compute in each dimension.
 
+
 ## References
 
 [1] D. Diaz-Guerra, A. Miguel, J.R. Beltran, "gpuRIR: A python library for Room Impulse Response simulation with GPU acceleration," .
-
 
 
 
