@@ -16,9 +16,9 @@
 
 ## Prerequisites
 
-* **OS**: It has been tested on GNU/Linux systems (Ubuntu and centOS). Please, let me know if you successfully install it on Windows or Mac OSX systems.
+* **OS**: It has been tested on GNU/Linux systems (Ubuntu and centOS) and Windows 10. Please, let me know if you successfully install it on Mac OSX systems.
 
-* **Compilers**: To install the package you will need the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (it has been tested with the release 8.0 but it should work fine with any version including cuRAND) and a C++11 compiler, such as [GCC](https://gcc.gnu.org/).
+* **Compilers**: To install the package you will need the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (it has been tested with the release 8.0 and 10.0 but it should work fine with any version that includes cuRAND) and a C++11 compiler, such as [GCC](https://gcc.gnu.org/) or [MSVC++](https://visualstudio.microsoft.com).
 
 * **CMake**: Finally, you will need, at least, the version 3.12 of [CMake](https://cmake.org/).  You can easily get it by `pip install cmake`.
 
@@ -29,7 +29,7 @@
 The library is subject to AGPL-3.0 license and comes with no warranty. If you find it useful for your research work, please, acknowledge it to [1]_.
 
 ## Installation
-You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR`. You can also clone or download our repository and run `python setup.py install`.
+You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR/zipball/master`. You can also clone or download our repository and run `python setup.py install`.
 
 ## Documentation
 
@@ -45,7 +45,7 @@ Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM). Fo
         Reflection coefficients of the walls as $[beta_{x0}, beta_{x1}, beta_{y0}, beta_{y1}, beta_{z0}, beta_{z1}]$, where $beta_{x0}$ is the coeffcient of the wall parallel to the x axis closest to the origin of coordinates system and $beta_{x1}$ the farthest.
 * **pos_src**, **pos_rcv** : *ndarray with 2 dimensions and 3 columns.*
         Position of the sources and the receivers (in meters).
-* **nb_img** : array_like with 3 integer elements
+* **nb_img** : *array_like with 3 integer elements*
         Number of images to simulate in each dimension.
 * **Tmax** : *float*
         RIRs length (in seconds).

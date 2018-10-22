@@ -47,7 +47,7 @@ py::array simulateRIR_bind(std::vector<scalar_t> room_sz, // Size of the room [m
 									 &nb_img[0], Tdiff, Tmax, Fs, c);
 	
 	int nSamples = ceil(Tmax*Fs);
-	std::vector<size_t> shape = {M_src, M_rcv, nSamples};
+	std::vector<int> shape = {M_src, M_rcv, nSamples};
 	std::vector<size_t> strides = {M_rcv*nSamples*sizeof(scalar_t), nSamples*sizeof(scalar_t), sizeof(scalar_t)};
 	return py::array(py::buffer_info(rir, sizeof(scalar_t), py::format_descriptor<scalar_t>::format(), 3, shape, strides)); 
 
