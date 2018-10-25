@@ -1,11 +1,14 @@
 ''' Room Impulse Responses (RIRs) simulations with GPU acceleration.
 '''
+from __future__ import division
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy.signal import convolve
+
 from gpuRIR_bind import simulateRIR_bind
 
-__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR"]
+__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory"]
 
 mic_patterns =	{
   "omni": 0,
@@ -151,4 +154,43 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 	else: orV_rcv = orV_rcv.astype('float32', order='C', copy=False)
 		
 	return simulateRIR_bind(room_sz, beta, pos_src, pos_rcv, orV_rcv, mic_patterns[mic_pattern], nb_img, Tdiff, Tmax, fs, c)
+
+def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
+	''' Filter an audio signal by the RIRs of a motion trajectory recorded with a microphone array.
+
+	Parameters
+	----------
+	source_signal : array_like
+		Signal of the moving source.
+	RIRs : 3D ndarray
+		Room Impulse Responses generated with simulateRIR.
+	timestamps : array_like, optional
+		Timestamp of each RIR [s]. By default, the RIRs are equispaced through the trajectory.
+	fs : float, optional
+		Sampling frequency (in Hertz). It is only needed for custom timestamps.
+
+	Returns
+	-------
+	2D ndarray
+		Matrix with the signals captured by each microphone in each column.
+
+	'''
+	nSamples = len(source_signal)
+	nPts = RIRs.shape[0]
+	nRcv = RIRs.shape[1]
+	lenRIR = RIRs.shape[2]
+	
+	assert timestamps is None or fs is not None, "fs must be indicated for custom timestamps"
+	assert timestamps is None or timestamps[0] == 0, "The first timestamp must be 0"
+	if timestamps is None:
+		fs = nSamples / nPts
+		timestamps = np.arange(nPts)
+	
+	w_ini = np.append((timestamps*fs).astype(int), nSamples)
+	filtered_signal = np.zeros((nSamples+lenRIR-1, nRcv))
+	for m in range(nRcv):
+		for n in range(nPts):
+			filtered_signal[w_ini[n] : w_ini[n+1]+lenRIR-1, m] += convolve(source_signal[w_ini[n] : w_ini[n+1]], RIRs[n,m,:])
+		
+	return filtered_signal
 	
