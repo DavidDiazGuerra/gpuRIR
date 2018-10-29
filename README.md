@@ -8,6 +8,7 @@
 - [License](#license)
 - [Documentation](#documentation)
   * [`simulateRIR`](#simulaterir)
+  * [`simulateTrajectory`](#simulatetrajectory)
   * [`beta_SabineEstimation`](#beta_sabineestimation)
   * [`att2t_SabineEstimator`](#att2t_sabineestimator)
   * [`t2n`](#t2n)
@@ -78,6 +79,26 @@ Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM). Fo
 
 Asking for too much and too long RIRs (specially for full ISM simulations) may exceed the GPU memory and crash the kernel.
 
+### `simulateTrajectory`
+
+Filter an audio signal by the RIRs of a motion trajectory recorded with a microphone array.
+
+#### Parameters
+
+* **source_signal** : *array_like.*
+	Signal of the moving source.
+* **RIRs** : *3D ndarray*
+	Room Impulse Responses generated with simulateRIR.
+* **timestamps** : *array_like, optional*
+	Timestamp of each RIR [s]. By default, the RIRs are equispaced through the trajectory.
+* **fs** : *float, optional*
+	Sampling frequency (in Hertz). It is only needed for custom timestamps.
+
+#### Returns
+
+*2D ndarray*
+	Matrix with the signals captured by each microphone in each column.
+
 ### `beta_SabineEstimation`
 
 Estimation of the reflection coefficients needed to have the desired reverberation time.
@@ -133,7 +154,7 @@ Estimation of the number of images needed for a correct RIR simulation.
 
 ## References
 
-[1] D. Diaz-Guerra, A. Miguel, J.R. Beltran, "gpuRIR: A python library for Room Impulse Response simulation with GPU acceleration," .
+[1] D. Diaz-Guerra, A. Miguel, J.R. Beltran, "gpuRIR: A python library for Room Impulse Response simulation with GPU acceleration," [[arXiv preprint](https://arxiv.org/abs/1810.11359)].
 
 
 
