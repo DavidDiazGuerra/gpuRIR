@@ -65,7 +65,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='gpuRIR',
-    version='0.0.1',
+    version='1.0.0',
     author='David Diaz-Guerra',
     author_email='ddga@unizar.es',
     url='',
