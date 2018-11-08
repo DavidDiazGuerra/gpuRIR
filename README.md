@@ -25,6 +25,8 @@
 
 * **Python**: It has been tested in Python 3, but should work fine with Python 2.
 
+**Note for PyTorch users**: If you are going to use this module with PyTorch, the compiler you use to build gpuRIR must be ABI-compatible with the compiler PyTorch was built with, so you must use GCC version 4.9 and above.
+
 
 ## Installation
 You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR/zipball/master`. You can also clone or download our repository and run `python setup.py install`.
