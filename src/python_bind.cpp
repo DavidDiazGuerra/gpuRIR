@@ -55,7 +55,7 @@ py::array simulateRIR_bind(std::vector<scalar_t> room_sz, // Size of the room [m
 
 PYBIND11_MODULE(gpuRIR_bind,m)
 {
-  m.doc() = "Room Iimpulse Response (RIR) simulation through Image Source Method (ISM) with GPU aceleration.";
+  m.doc() = "Room Impulse Response (RIR) simulation through Image Source Method (ISM) with GPU acceleration.";
 
   m.def("simulateRIR_bind", &simulateRIR_bind, "RIR simulation", py::arg("room_sz"), py::arg("beta"), py::arg("pos_src"), 
 		py::arg("pos_rcv"), py::arg("orV_rcv"), py::arg("mic_pattern"), py::arg("nb_img"), py::arg("Tdiff"), py::arg("Tmax"), 
