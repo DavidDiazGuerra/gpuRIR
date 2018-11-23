@@ -1,4 +1,4 @@
-# Install script for directory: /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/pybind11
+# Install script for directory: /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/third_party/pybind11
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

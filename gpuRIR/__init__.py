@@ -6,7 +6,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from gpuRIR_bind import simulateRIR_bind
+from gpuRIR_bind import simulateRIR_bind, gpu_conv
 
 __all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory"]
 
@@ -187,10 +187,16 @@ def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 		timestamps = np.arange(nPts)
 	
 	w_ini = np.append((timestamps*fs).astype(int), nSamples)
+	w_len = np.diff(w_ini)
+	segments = np.zeros((nPts, w_len.max()))
+	for n in range(nPts):
+		segments[n,0:w_len[n]] = source_signal[w_ini[n]:w_ini[n+1]]
+	segments = segments.astype('float32', order='C', copy=False)
+	convolution = gpu_conv(segments, RIRs)
+	
 	filtered_signal = np.zeros((nSamples+lenRIR-1, nRcv))
 	for m in range(nRcv):
 		for n in range(nPts):
-			filtered_signal[w_ini[n] : w_ini[n+1]+lenRIR-1, m] += convolve(source_signal[w_ini[n] : w_ini[n+1]], RIRs[n,m,:])
+			filtered_signal[w_ini[n] : w_ini[n+1]+lenRIR-1, m] += convolution[n, m, 0:w_len[n]+lenRIR-1]
 		
 	return filtered_signal
-	

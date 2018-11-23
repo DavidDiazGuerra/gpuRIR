@@ -39,10 +39,10 @@ cmake_force:
 SHELL = /bin/sh
 
 # The CMake executable.
-CMAKE_COMMAND = /usr/bin/cmake3
+CMAKE_COMMAND = /home/daviddiaz/anaconda2/envs/py36/lib/python3.6/site-packages/cmake/data/bin/cmake
 
 # The command to remove a file.
-RM = /usr/bin/cmake3 -E remove -f
+RM = /home/daviddiaz/anaconda2/envs/py36/lib/python3.6/site-packages/cmake/data/bin/cmake -E remove -f
 
 # Escaping for special characters.
 EQUALS = =
@@ -58,8 +58,8 @@ CMAKE_BINARY_DIR = /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gp
 
 # Special rule for the target edit_cache
 edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
-	/usr/bin/ccmake3 -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
+	/home/daviddiaz/anaconda2/envs/py36/lib/python3.6/site-packages/cmake/data/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -70,7 +70,7 @@ edit_cache/fast: edit_cache
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
-	/usr/bin/cmake3 -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+	/home/daviddiaz/anaconda2/envs/py36/lib/python3.6/site-packages/cmake/data/bin/cmake -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
 # Special rule for the target rebuild_cache
@@ -80,14 +80,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(CMAKE_COMMAND) -E cmake_progress_start /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/CMakeFiles /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/pybind11/CMakeFiles/progress.marks
-	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 pybind11/all
+	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(CMAKE_COMMAND) -E cmake_progress_start /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/CMakeFiles /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/third_party/pybind11/CMakeFiles/progress.marks
+	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 third_party/pybind11/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 pybind11/clean
+	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 third_party/pybind11/clean
 .PHONY : clean
 
 # The main clean target
@@ -97,12 +97,12 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 pybind11/preinstall
+	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 third_party/pybind11/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 pybind11/preinstall
+	cd /home/daviddiaz/RIRsimulator/python_library/pybind11_tests/gpuRIR && $(MAKE) -f CMakeFiles/Makefile2 third_party/pybind11/preinstall
 .PHONY : preinstall/fast
 
 # clear depends

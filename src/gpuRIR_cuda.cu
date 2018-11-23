@@ -7,6 +7,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <curand.h>
+#include <cufft.h>
+#include <cufftXt.h>
 
 #include <vector>
 
@@ -39,6 +41,11 @@ const int nThreadsDiff_t = 16;
 const int nThreadsDiff_src = 4;
 const int nThreadsDiff_rcv = 2;
 
+// RIR filtering onvolution
+const int nThreadsConv_x = 256;
+const int nThreadsConv_y = 1;
+const int nThreadsConv_z = 1;
+
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
    if (code != cudaSuccess) 
@@ -57,6 +64,25 @@ inline void gpuAssert(curandStatus_t code, const char *file, int line, bool abor
    }
 }
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cufftResult_t code, const char *file, int line, bool abort=true) {
+   if (code != CURAND_STATUS_SUCCESS) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", code, file, line);
+      if (abort) exit(code);
+   }
+}
+
+inline unsigned int pow2roundup (unsigned int x) {
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return x+1;
+}
 
 /*****************************/
 /* Auxiliar device functions */
@@ -98,6 +124,22 @@ __device__ __forceinline__ scalar_t mic_directivity(scalar_t doaVec[3], scalar_t
 		case DIR_SUBCARD: 	return 0.75f + 0.25f*cosTheta;
 		case DIR_BIDIR: 	return cosTheta;
 	}
+}
+
+// cufftComplex scale
+__device__ __forceinline__ cufftComplex ComplexScale(cufftComplex a, float s) {
+    cufftComplex c;
+    c.x = s * a.x;
+    c.y = s * a.y;
+    return c;
+}
+
+// cufftComplex multiplication
+__device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex b) {
+    cufftComplex c;
+    c.x = a.x * b.x - a.y * b.y;
+    c.y = a.x * b.y + a.y * b.x;
+    return c;
 }
 
 /***********/
@@ -303,6 +345,27 @@ __global__ void diffRev_kernel(scalar_t* rir, scalar_t* tim, scalar_t* A, scalar
 	}
 }
 
+__global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufftComplex *RIRs, int segment_size, int M_rcv, int M_src, float scale) {
+    int numThreads_x = blockDim.x * gridDim.x;
+    int numThreads_y = blockDim.y * gridDim.y;
+    int numThreads_z = blockDim.z * gridDim.z;
+	
+    int threadID_x = blockIdx.x * blockDim.x + threadIdx.x;
+    int threadID_y = blockIdx.y * blockDim.y + threadIdx.y;
+    int threadID_z = blockIdx.z * blockDim.z + threadIdx.z;
+
+	for (int m = threadID_z; m < M_src; m += numThreads_z) {
+		for (int n = threadID_y; n < M_rcv; n += numThreads_y) {
+			for (int i = threadID_x; i < segment_size; i += numThreads_x) {
+				RIRs[m*M_rcv*segment_size + n*segment_size + i] = 
+					ComplexScale(ComplexMul(RIRs[m*M_rcv*segment_size + n*segment_size + i], 
+											signal_segments[m*segment_size + i]), 
+								 scale);
+			}
+		}
+	}
+}
+
 /***************************/
 /* Auxiliar host functions */
 /***************************/
@@ -350,9 +413,35 @@ scalar_t* cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t*
 	return rir;
 }
 
-/**********************/
-/* Principal function */
-/**********************/
+int PadData(scalar_t *signal, scalar_t **padded_signal, int segment_len,
+            scalar_t *RIR, scalar_t **padded_RIR, int M_src, int M_rcv, int RIR_len) {
+				
+    int N_fft = pow2roundup(segment_len + RIR_len - 1);
+
+    // Pad signal
+    float *new_data = (float *)malloc(sizeof(float) * M_src * (N_fft+2));
+	for (int m=0; m<M_src; m++) {
+		memcpy(new_data + m*(N_fft+2), signal + m*segment_len, segment_len*sizeof(float));
+		memset(new_data + m*(N_fft+2) + segment_len, 0, ((N_fft+2)-segment_len)*sizeof(float));
+	}
+    *padded_signal = new_data;
+
+    // Pad filter
+    new_data = (float *)malloc(sizeof(float) * M_src * M_rcv * (N_fft+2));
+	for (int m=0; m<M_src; m++) {
+		for (int n=0; n<M_rcv; n++) {
+			memcpy(new_data + m*M_rcv*(N_fft+2) + n*(N_fft+2), RIR + m*M_rcv*RIR_len + n*RIR_len, RIR_len*sizeof(float));
+			memset(new_data + m*M_rcv*(N_fft+2) + n*(N_fft+2) + RIR_len, 0, ((N_fft+2)-RIR_len)*sizeof(float));
+		}
+	}
+    *padded_RIR = new_data;
+
+    return N_fft;
+}
+
+/***********************/
+/* Principal functions */
+/***********************/
 
 scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, 
 						   scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
@@ -505,4 +594,96 @@ scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_po
 	gpuErrchk( cudaFree(rirDiff) );
 	
 	return h_rir;
+}
+
+scalar_t* cuda_convolutions(scalar_t* source_segments, int M_src, int segment_len,
+						    scalar_t* RIR, int M_rcv, int RIR_len) {	
+	// function scalar_t* cuda_filterRIR(scalar_t* source_segments, int M_src, int segments_len,
+	//									 scalar_t* RIR, int M_rcv, int RIR_len);
+	// Input parameters:
+	// 	scalar_t* source_segments : Source signal segment for each trajectory point
+	//	int M_src 				  : Number of trajectory points
+	//	int segment_len 		  : Length of the segments [samples]
+	//	scalar_t* RIR		 	  : 3D array with the RIR from each point of the trajectory to each receiver
+	//	int M_rcv 				  : Number of receivers
+	//	int RIR_len 			  : Length of the RIRs [samples]
+
+	// Size of the FFT needed to avoid circular convolution effects
+	int N_fft = pow2roundup(segment_len + RIR_len - 1);
+	
+	// Copy the signal segments with zero padding
+    int mem_size_signal = sizeof(scalar_t) * M_src * (N_fft+2);
+    cufftComplex *d_signal;
+    gpuErrchk( cudaMalloc((void **)&d_signal, mem_size_signal) );
+	gpuErrchk( cudaMemcpy2D((void *)d_signal, (N_fft+2)*sizeof(scalar_t), 
+		(void *)source_segments, segment_len*sizeof(scalar_t),
+		segment_len*sizeof(scalar_t), M_src, cudaMemcpyHostToDevice) );
+	gpuErrchk( cudaMemset2D((void *)((scalar_t *)d_signal + segment_len), (N_fft+2)*sizeof(scalar_t),
+		0, (N_fft+2-segment_len)*sizeof(scalar_t), M_src ) );
+	
+	// Copy the RIRs with zero padding
+	cudaPitchedPtr h_RIR_pitchedPtr = make_cudaPitchedPtr( (void*) RIR, 
+		RIR_len*sizeof(scalar_t), RIR_len, M_rcv );
+    int mem_size_RIR = sizeof(scalar_t) * M_src * M_rcv * (N_fft+2);
+	cufftComplex *d_RIR;
+	gpuErrchk( cudaMalloc((void **)&d_RIR, mem_size_RIR) );
+	cudaPitchedPtr d_RIR_pitchedPtr = make_cudaPitchedPtr( (void*) d_RIR, 
+		(N_fft+2)*sizeof(scalar_t), (N_fft+2), M_rcv );
+	cudaMemcpy3DParms parmsCopySignal = {0};
+	parmsCopySignal.srcPtr = h_RIR_pitchedPtr;
+	parmsCopySignal.dstPtr = d_RIR_pitchedPtr;
+	parmsCopySignal.extent = make_cudaExtent(RIR_len*sizeof(scalar_t), M_rcv, M_src);
+	parmsCopySignal.kind = cudaMemcpyHostToDevice;
+	gpuErrchk( cudaMemcpy3D(&parmsCopySignal) );
+	gpuErrchk( cudaMemset2D((void *)((scalar_t *)d_RIR + RIR_len), (N_fft+2)*sizeof(scalar_t),
+		0, (N_fft+2-RIR_len)*sizeof(scalar_t), M_rcv*M_src ) );
+	
+	// CUFFT plans
+    cufftHandle plan_signal, plan_RIR, plan_RIR_inv;
+    gpuErrchk( cufftPlan1d(&plan_signal,  N_fft, CUFFT_R2C, M_src) );
+    gpuErrchk( cufftPlan1d(&plan_RIR,     N_fft, CUFFT_R2C, M_src * M_rcv) );
+    gpuErrchk( cufftPlan1d(&plan_RIR_inv, N_fft, CUFFT_C2R, M_src * M_rcv) );
+	
+	// Transform signal and RIR
+    gpuErrchk( cufftExecR2C(plan_signal, (cufftReal *)d_signal, (cufftComplex *)d_signal) );
+    gpuErrchk( cufftExecR2C(plan_RIR,    (cufftReal *)d_RIR,    (cufftComplex *)d_RIR   ) );
+	
+	// Multiply the coefficients together and normalize the result
+	dim3 threadsPerBlock(nThreadsConv_x, nThreadsConv_y, nThreadsConv_z);
+	int numBlocks_x = (int) ceil((float)(N_fft/2+1)/nThreadsConv_x);
+	int numBlocks_y = (int) ceil((float)M_rcv/nThreadsConv_y);
+	int numBlocks_z = (int) ceil((float)M_src/nThreadsConv_z);
+	dim3 numBlocks(numBlocks_x, numBlocks_y, numBlocks_z);
+    complexPointwiseMulAndScale<<<numBlocks, threadsPerBlock>>>
+			(d_signal, d_RIR, (N_fft/2+1), M_rcv, M_src, 1.0f/N_fft);
+	gpuErrchk( cudaDeviceSynchronize() );
+	gpuErrchk( cudaPeekAtLastError() );
+	
+	// Transform signal back
+    gpuErrchk( cufftExecC2R(plan_RIR_inv, (cufftComplex *)d_RIR, (cufftReal *)d_RIR) );
+	
+	// Copy device memory to host
+	int conv_len = segment_len + RIR_len - 1;
+    scalar_t *convolved_segments = (scalar_t *)malloc(sizeof(scalar_t)*M_src*M_rcv*conv_len);
+	cudaPitchedPtr d_convolved_segments_pitchedPtr = make_cudaPitchedPtr( (void*) d_RIR, 
+		(N_fft+2)*sizeof(scalar_t), conv_len, M_rcv );
+	cudaPitchedPtr h_convolved_segments_pitchedPtr = make_cudaPitchedPtr( (void*) convolved_segments, 
+		conv_len*sizeof(scalar_t), conv_len, M_rcv );
+	cudaMemcpy3DParms parmsCopy = {0};
+	parmsCopy.srcPtr = d_convolved_segments_pitchedPtr;
+	parmsCopy.dstPtr = h_convolved_segments_pitchedPtr;
+	parmsCopy.extent = make_cudaExtent(conv_len*sizeof(scalar_t), M_rcv, M_src);
+	parmsCopy.kind = cudaMemcpyDeviceToHost;
+	gpuErrchk( cudaMemcpy3D(&parmsCopy) );
+
+	//Destroy CUFFT context
+    gpuErrchk( cufftDestroy(plan_signal) );
+    gpuErrchk( cufftDestroy(plan_RIR) );
+    gpuErrchk( cufftDestroy(plan_RIR_inv) );
+
+    // cleanup memory
+    gpuErrchk( cudaFree(d_signal) );
+    gpuErrchk( cudaFree(d_RIR) );
+	
+	return convolved_segments;
 }

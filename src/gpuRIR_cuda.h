@@ -1,6 +1,6 @@
 
-
 typedef float scalar_t;
+//typedef float2 Complex;
 
 // Accepted polar patterns for the receivers:
 typedef int micPattern;
@@ -13,4 +13,5 @@ typedef int micPattern;
 
 #define PI 3.141592654f
 
-scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3], scalar_t Tdiff, scalar_t Tmax, scalar_t Fs, scalar_t c);
+scalar_t* cuda_simulateRIR(scalar_t[3], scalar_t[6], scalar_t*, int, scalar_t*, scalar_t*, micPattern, int, int[3], scalar_t, scalar_t, scalar_t, scalar_t);
+scalar_t* cuda_convolutions(scalar_t*, int, int,scalar_t*, int, int);

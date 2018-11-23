@@ -1,6 +1,7 @@
 # https://stackoverflow.com/questions/51907755/building-a-pybind11-module-with-cpp-and-cuda-sources-using-cmake
 
 cmake_minimum_required(VERSION 3.12)
+#set(CMAKE_CXX_COMPILER "/usr/local/gcc55/bin/g++55")
 project(gpuRIR LANGUAGES CXX CUDA)
 find_package(CUDA)
 
@@ -43,5 +44,6 @@ else()
 endif()
 
 target_link_libraries(gpuRIR_bind PRIVATE ${CUDA_curand_LIBRARY})
+target_link_libraries(gpuRIR_bind PRIVATE ${CUDA_CUFFT_LIBRARIES})
 target_link_libraries(gpuRIR_bind PRIVATE gpuRIRcu)
 target_link_libraries(gpuRIR_bind PRIVATE pybind11::module)
