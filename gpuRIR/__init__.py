@@ -6,7 +6,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from gpuRIR_bind import simulateRIR_bind, gpu_conv
+from gpuRIR_bind import simulateRIR_bind, gpu_conv, cuda_warmup
 
 __all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory"]
 
@@ -200,3 +200,6 @@ def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 			filtered_signal[w_ini[n] : w_ini[n+1]+lenRIR-1, m] += convolution[n, m, 0:w_len[n]+lenRIR-1]
 		
 	return filtered_signal
+
+# Initialize the CUDA runtime API and the cuFFT library when the module is loaded
+cuda_warmup()

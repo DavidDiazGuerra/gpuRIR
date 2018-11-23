@@ -687,3 +687,13 @@ scalar_t* cuda_convolutions(scalar_t* source_segments, int M_src, int segment_le
 	
 	return convolved_segments;
 }
+
+void cuda_warmup() {
+	scalar_t* memPtr_warmup;
+	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(scalar_t)) );
+	gpuErrchk( cudaFree(memPtr_warmup) );
+	
+    cufftHandle plan_warmup;
+    gpuErrchk( cufftPlan1d(&plan_warmup,  1024, CUFFT_R2C, 1) );
+	gpuErrchk( cufftDestroy(plan_warmup) );
+}
