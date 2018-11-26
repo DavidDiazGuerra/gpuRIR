@@ -45,11 +45,16 @@ py::array simulateRIR_bind(std::vector<scalar_t> room_sz, // Size of the room [m
 									 (scalar_t*) info_pos_src.ptr, M_src, 
 									 (scalar_t*) info_pos_rcv.ptr, (scalar_t*) info_orV_rcv.ptr, mic_pattern, M_rcv, 
 									 &nb_img[0], Tdiff, Tmax, Fs, c);
+
+	py::capsule free_when_done(rir, [](void *f) {
+		scalar_t *foo = reinterpret_cast<scalar_t *>(f);
+		delete[] foo;
+	});
 	
 	int nSamples = ceil(Tmax*Fs);
 	std::vector<int> shape = {M_src, M_rcv, nSamples};
 	std::vector<size_t> strides = {M_rcv*nSamples*sizeof(scalar_t), nSamples*sizeof(scalar_t), sizeof(scalar_t)};
-	return py::array(py::buffer_info(rir, sizeof(scalar_t), py::format_descriptor<scalar_t>::format(), 3, shape, strides)); 
+	return py::array_t<scalar_t>(shape, strides, rir, free_when_done);
 
 }
 
@@ -72,10 +77,15 @@ py::array gpu_conv(py::array_t<scalar_t, py::array::c_style> source_segments, //
 	scalar_t* convolution = cuda_convolutions((scalar_t*)info_source_segments.ptr, M_src, segment_len,
 											  (scalar_t*)info_RIR.ptr, M_rcv, RIR_len);
 	
+	py::capsule free_when_done(convolution, [](void *f) {
+		scalar_t *foo = reinterpret_cast<scalar_t *>(f);
+		delete[] foo;
+	});
+		
 	int nSamples = segment_len+RIR_len-1;
 	std::vector<int> shape = {M_src, M_rcv, nSamples};
 	std::vector<size_t> strides = {M_rcv*nSamples*sizeof(scalar_t), nSamples*sizeof(scalar_t), sizeof(scalar_t)};
-	return py::array(py::buffer_info(convolution, sizeof(scalar_t), py::format_descriptor<scalar_t>::format(), 3, shape, strides)); 
+	return py::array_t<scalar_t>(shape, strides, convolution, free_when_done);
 
 }
 
