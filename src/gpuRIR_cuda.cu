@@ -541,6 +541,7 @@ scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_po
 		gpuErrchk( curandGenerateUniform(gen, rirDiff, M_src*M_rcv*nSamplesDiff) );
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
+		gpuErrchk( curandDestroyGenerator(gen) );
 		
 		dim3 threadsPerBlockDiff(nThreadsDiff_t, nThreadsDiff_src, nThreadsDiff_rcv);
 		dim3 numBlocksDiff(ceil((float)nSamplesDiff / nThreadsDiff_t),
@@ -584,6 +585,7 @@ scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_po
 	// Free memory
 	gpuErrchk( cudaFree(pos_src) );
 	gpuErrchk( cudaFree(pos_rcv) );
+	gpuErrchk( cudaFree(orV_rcv) );
 	gpuErrchk( cudaFree(amp)	 );
 	gpuErrchk( cudaFree(tau)	 );
 	gpuErrchk( cudaFree(tau_dp)	 );
