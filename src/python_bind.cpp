@@ -81,7 +81,7 @@ py::array gpu_conv(py::array_t<scalar_t, py::array::c_style> source_segments, //
 
 PYBIND11_MODULE(gpuRIR_bind,m)
 {
-  m.doc() = "Room Iimpulse Response (RIR) simulation through Image Source Method (ISM) with GPU aceleration.";
+  m.doc() = "Room Impulse Response (RIR) simulation through Image Source Method (ISM) with GPU acceleration.";
 
   m.def("simulateRIR_bind", &simulateRIR_bind, "RIR simulation", py::arg("room_sz"), py::arg("beta"), py::arg("pos_src"), 
 		py::arg("pos_rcv"), py::arg("orV_rcv"), py::arg("mic_pattern"), py::arg("nb_img"), py::arg("Tdiff"), py::arg("Tmax"), 
@@ -89,5 +89,5 @@ PYBIND11_MODULE(gpuRIR_bind,m)
 		
   m.def("gpu_conv", &gpu_conv, "Batched convolution using FFTs in GPU", py::arg("source_segments"), py::arg("RIR"));
   
-  m.def("cuda_warmup", &cuda_warmup, "Ininialize the CUDA runtime API and the cuFFT library");
+  m.def("cuda_warmup", &cuda_warmup, "Initialize the CUDA runtime API and the cuFFT library");
 }
