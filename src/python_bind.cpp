@@ -89,5 +89,5 @@ PYBIND11_MODULE(gpuRIR_bind,m)
 		
   m.def("gpu_conv", &gpu_conv, "Batched convolution using FFTs in GPU", py::arg("source_segments"), py::arg("RIR"));
   
-  m.def("cuda_warmup", &cuda_warmup, "Ininialize the CUDA runtime API and the cuFFT library");
+  m.def("cuda_warmup", &cuda_warmup, "Initialize the CUDA runtime API and the cuFFT library");
 }
