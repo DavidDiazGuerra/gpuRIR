@@ -1,6 +1,4 @@
 
-#include "gpuRIR_cuda.h"
-
 #include <iostream>
 #include <stdio.h>
 
@@ -11,40 +9,19 @@
 #include <cufftXt.h>
 
 #include <vector>
+#include "gpuRIR_cuda.h"
 
-/******************************/
-/* Parallelization parameters */
-/******************************/
+// To hide the cuRAND generator in the header and don't need to include the cuda headers there
+struct cuRandGeneratorWrapper_t
+{
+   curandGenerator_t gen;
+};
+cuRandGeneratorWrapper_t gpuRIR_cuda::cuRandGenWrap;
 
-// Image Source Method
-const int nThreadsISM_x = 4;
-const int nThreadsISM_y = 4;
-const int nThreadsISM_z = 4;
 
-// Time vector generation
-const int nThreadsTime = 128;
-
-// RIR computation
-const int initialReductionMin = 512;
-const int nThreadsGen_t = 32;
-const int nThreadsGen_m = 4;
-const int nThreadsGen_n = 1; // Don't change it
-const int nThreadsRed = 128;
-
-// Power envelope prediction
-const int nThreadsEnvPred_x = 4;
-const int nThreadsEnvPred_y = 4;
-const int nThreadsEnvPred_z = 1; // Don't change it
-
-// Generate diffuse reverberation
-const int nThreadsDiff_t = 16;
-const int nThreadsDiff_src = 4;
-const int nThreadsDiff_rcv = 2;
-
-// RIR filtering onvolution
-const int nThreadsConv_x = 256;
-const int nThreadsConv_y = 1;
-const int nThreadsConv_z = 1;
+/***************************/
+/* Auxiliar host functions */
+/***************************/
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
@@ -255,7 +232,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 
 __global__ void generateTime_kernel(scalar_t* t, scalar_t Fs, int nSamples) {
 	int sample = blockIdx.x * blockDim.x + threadIdx.x;
-	if (sample<nSamples) {t[sample] = sample/Fs; /* printf("%d %f \n", sample, t[sample]); */} 
+	if (sample<nSamples) t[sample] = sample/Fs;
 }
 
 __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {	
@@ -337,7 +314,7 @@ __global__ void diffRev_kernel(scalar_t* rir, scalar_t* tim, scalar_t* A, scalar
 	if (sample<nSamples && m_src<M_src && m_rcv<M_rcv) {
 		// Get logistic distribution from uniform distribution
 		scalar_t uniform = rir[m_src*M_rcv*nSamples + m_rcv*nSamples + sample];
-		scalar_t logistic = 0.551329f * logf(uniform/(1.0f - uniform)); // 0.551329 == sqrt(3)/pi
+		scalar_t logistic = 0.551329f * logf(uniform/(1.0f - uniform + 1e-6)); // 0.551329 == sqrt(3)/pi
 		
 		// Apply power envelope
 		scalar_t pow_env = A[m_src*M_rcv+m_rcv] * expf(alpha[m_src*M_rcv+m_rcv] * (tim[sample]-tau_dp[m_src*M_rcv+m_rcv]));
@@ -370,7 +347,7 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 /* Auxiliar host functions */
 /***************************/
 
-scalar_t* cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+scalar_t* gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
 	int initialReduction = initialReductionMin;
 	while (M * T * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
 	
@@ -413,8 +390,8 @@ scalar_t* cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t*
 	return rir;
 }
 
-int PadData(scalar_t *signal, scalar_t **padded_signal, int segment_len,
-            scalar_t *RIR, scalar_t **padded_RIR, int M_src, int M_rcv, int RIR_len) {
+int gpuRIR_cuda::PadData(scalar_t *signal, scalar_t **padded_signal, int segment_len,
+						 scalar_t *RIR, scalar_t **padded_RIR, int M_src, int M_rcv, int RIR_len) {
 				
     int N_fft = pow2roundup(segment_len + RIR_len - 1);
 
@@ -443,9 +420,9 @@ int PadData(scalar_t *signal, scalar_t **padded_signal, int segment_len,
 /* Principal functions */
 /***********************/
 
-scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, 
-						   scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
-						   scalar_t Tdiff, scalar_t Tmax, scalar_t Fs, scalar_t c) {	
+scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, 
+									   scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
+									   scalar_t Tdiff, scalar_t Tmax, scalar_t Fs, scalar_t c) {	
 	// function scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, 
 	//									   scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
 	//									   scalar_t Tdiff, scalar_t Tmax, scalar_t Fs, scalar_t c);
@@ -535,14 +512,11 @@ scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_po
 	gpuErrchk( cudaMalloc(&rirDiff, M_src*M_rcv*nSamplesDiff*sizeof(scalar_t)) );
 	
 	if (nSamplesDiff != 0) {
-		curandGenerator_t gen; // Fill rirDiff with random numbers with uniform distribution
-		gpuErrchk( curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT) );
-		gpuErrchk( curandSetPseudoRandomGeneratorSeed(gen, 1234ULL) );
-		gpuErrchk( curandGenerateUniform(gen, rirDiff, M_src*M_rcv*nSamplesDiff) );
+		// Fill rirDiff with random numbers with uniform distribution
+		gpuErrchk( curandGenerateUniform(cuRandGenWrap.gen, rirDiff, M_src*M_rcv*nSamplesDiff) );
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
-		gpuErrchk( curandDestroyGenerator(gen) );
-		
+				
 		dim3 threadsPerBlockDiff(nThreadsDiff_t, nThreadsDiff_src, nThreadsDiff_rcv);
 		dim3 numBlocksDiff(ceil((float)nSamplesDiff / nThreadsDiff_t),
 							  ceil((float)M_src / nThreadsDiff_src), 
@@ -598,8 +572,8 @@ scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_po
 	return h_rir;
 }
 
-scalar_t* cuda_convolutions(scalar_t* source_segments, int M_src, int segment_len,
-						    scalar_t* RIR, int M_rcv, int RIR_len) {	
+scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, int segment_len,
+										scalar_t* RIR, int M_rcv, int RIR_len) {	
 	// function scalar_t* cuda_filterRIR(scalar_t* source_segments, int M_src, int segments_len,
 	//									 scalar_t* RIR, int M_rcv, int RIR_len);
 	// Input parameters:
@@ -690,10 +664,13 @@ scalar_t* cuda_convolutions(scalar_t* source_segments, int M_src, int segment_le
 	return convolved_segments;
 }
 
-void cuda_warmup() {
+void gpuRIR_cuda::cuda_warmup() {
 	scalar_t* memPtr_warmup;
 	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(scalar_t)) );
 	gpuErrchk( cudaFree(memPtr_warmup) );
+
+	gpuErrchk( curandCreateGenerator(&cuRandGenWrap.gen, CURAND_RNG_PSEUDO_DEFAULT) );
+	gpuErrchk( curandSetPseudoRandomGeneratorSeed(cuRandGenWrap.gen, 1234ULL) );
 	
     cufftHandle plan_warmup;
     gpuErrchk( cufftPlan1d(&plan_warmup,  1024, CUFFT_R2C, 1) );

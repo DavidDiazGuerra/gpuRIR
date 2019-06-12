@@ -36,3 +36,9 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Folders #
+###########
+build/
+dist/
+gpurRIR.egg-info/

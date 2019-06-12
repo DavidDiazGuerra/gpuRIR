@@ -41,10 +41,10 @@ py::array simulateRIR_bind(std::vector<scalar_t> room_sz, // Size of the room [m
 	int M_src = info_pos_src.shape[0];
 	int M_rcv = info_pos_rcv.shape[0];
 	
-	scalar_t* rir = cuda_simulateRIR(&room_sz[0], &beta[0], 
-									 (scalar_t*) info_pos_src.ptr, M_src, 
-									 (scalar_t*) info_pos_rcv.ptr, (scalar_t*) info_orV_rcv.ptr, mic_pattern, M_rcv, 
-									 &nb_img[0], Tdiff, Tmax, Fs, c);
+	scalar_t* rir = gpuRIR_cuda::cuda_simulateRIR(&room_sz[0], &beta[0], 
+												  (scalar_t*) info_pos_src.ptr, M_src, 
+												  (scalar_t*) info_pos_rcv.ptr, (scalar_t*) info_orV_rcv.ptr, mic_pattern, M_rcv, 
+												  &nb_img[0], Tdiff, Tmax, Fs, c);
 
 	py::capsule free_when_done(rir, [](void *f) {
 		scalar_t *foo = reinterpret_cast<scalar_t *>(f);
@@ -74,8 +74,8 @@ py::array gpu_conv(py::array_t<scalar_t, py::array::c_style> source_segments, //
 	int M_rcv = info_RIR.shape[1];
 	int RIR_len = info_RIR.shape[2];
 	
-	scalar_t* convolution = cuda_convolutions((scalar_t*)info_source_segments.ptr, M_src, segment_len,
-											  (scalar_t*)info_RIR.ptr, M_rcv, RIR_len);
+	scalar_t* convolution = gpuRIR_cuda::cuda_convolutions((scalar_t*)info_source_segments.ptr, M_src, segment_len,
+														   (scalar_t*)info_RIR.ptr, M_rcv, RIR_len);
 	
 	py::capsule free_when_done(convolution, [](void *f) {
 		scalar_t *foo = reinterpret_cast<scalar_t *>(f);
@@ -87,6 +87,10 @@ py::array gpu_conv(py::array_t<scalar_t, py::array::c_style> source_segments, //
 	std::vector<size_t> strides = {M_rcv*nSamples*sizeof(scalar_t), nSamples*sizeof(scalar_t), sizeof(scalar_t)};
 	return py::array_t<scalar_t>(shape, strides, convolution, free_when_done);
 
+}
+
+void cuda_warmup() {
+	gpuRIR_cuda::cuda_warmup();
 }
 
 PYBIND11_MODULE(gpuRIR_bind,m)
