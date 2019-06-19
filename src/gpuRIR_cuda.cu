@@ -664,15 +664,30 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 	return convolved_segments;
 }
 
-void gpuRIR_cuda::cuda_warmup() {
+gpuRIR_cuda::gpuRIR_cuda(bool mPrecision=false) {	
+	activate_mixed_precision(mPrecision);
+	
+	// Initiate CUDA runtime API
 	scalar_t* memPtr_warmup;
 	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(scalar_t)) );
 	gpuErrchk( cudaFree(memPtr_warmup) );
-
-	gpuErrchk( curandCreateGenerator(&cuRandGenWrap.gen, CURAND_RNG_PSEUDO_DEFAULT) );
-	gpuErrchk( curandSetPseudoRandomGeneratorSeed(cuRandGenWrap.gen, 1234ULL) );
 	
+	// Initiate cuFFT library
     cufftHandle plan_warmup;
     gpuErrchk( cufftPlan1d(&plan_warmup,  1024, CUFFT_R2C, 1) );
 	gpuErrchk( cufftDestroy(plan_warmup) );
+	
+	// Initialize cuRAND generator
+    gpuErrchk( curandCreateGenerator(&cuRandGenWrap.gen, CURAND_RNG_PSEUDO_DEFAULT) );
+	gpuErrchk( curandSetPseudoRandomGeneratorSeed(cuRandGenWrap.gen, 1234ULL) );
+}
+
+bool gpuRIR_cuda::activate_mixed_precision(bool activate) {
+	#if __CUDA_ARCH__ >= 530
+		mixed_precision = activate;
+	#else
+		if (activate) printf("This feature requires Pascal GPU architecture or higher.\n");
+		mixed_precision = false;
+	#endif
+	return mixed_precision;
 }
