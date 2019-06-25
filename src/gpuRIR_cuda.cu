@@ -7,6 +7,7 @@
 #include <curand.h>
 #include <cufft.h>
 #include <cufftXt.h>
+#include <cuda_fp16.h>
 
 #include <vector>
 #include "gpuRIR_cuda.h"
@@ -18,6 +19,14 @@ struct cuRandGeneratorWrapper_t
 };
 cuRandGeneratorWrapper_t gpuRIR_cuda::cuRandGenWrap;
 
+
+#if __CUDA_ARCH__ >= 530
+// Useful half2 constants
+static const half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+static const half2 h2ones = __floats2half2_rn(1.0, 1.0);
+static const half2 h2twos = __floats2half2_rn(2.0, 2.0);
+static const half2 h2pis = __floats2half2_rn(PI, PI);
+#endif
 
 /***************************/
 /* Auxiliar host functions */
@@ -118,6 +127,31 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
     c.y = a.x * b.y + a.y * b.x;
     return c;
 }
+
+/*********************************************/
+/* Mixed precision auxiliar device functions */
+/*********************************************/
+#if __CUDA_ARCH__ >= 530
+
+__device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 Tw) {
+	return __hdiv2(hadd2(h2ones, h2cos(__hdiv2(__hmul2(__hmul2(h2twos, h2pis), t), Tw))), h2twos);
+}
+
+__device__ __forceinline__ scalar_t sinc_mp(half2 x) {
+	return __hfma2(__hdiv2(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
+}
+
+__device__ __forceinline__ scalar_t image_sample_mp(half2 amp, half2 tau, half2 t, scalar_t Fs) {
+	static const half2 Tw = __floats2half2_rn(8e-3f, 8e-3f); // Window duration [s]
+	
+	half2 FsPI = __hmul2( __floats2half2_rn(Fs, Fs), h2pis);
+	half2 t_tau = __hsub2(t, tau);
+	t_tau = __hmul2(t_tau, __hsub2(__hge2(t_tau, h2zeros), h2ones)); //habs2 does not exist
+	bool close_to_center = __hble2(t_tau, __hdiv2(Tw, h2twos));
+	return close_to_center? __hmul2(hanning_window_mp(t_tau, Tw), __hmul2(amp, sinc_mp( __hmul2((t_tau), FsPI) ))) : h2zeros;
+}
+
+#endif
 
 /***********/
 /* KERNELS */
@@ -344,10 +378,73 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 }
 
 /***************************/
+/* Mixed precision KERNELS */
+/***************************/
+#if __CUDA_ARCH__ >= 530
+
+__global__ void generateTime_mp_kernel( half2* t, scalar_t Fs, int nSamples) {
+	int sample1 = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
+	if (sample1<nSamples) t[sample1/2] = __floats2half2_rn(sample1/Fs, (sample1+1)/Fs);
+}
+
+__global__ void generateRIR_mp_kernel(half2* initialRIR, half2* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {	
+	int t = blockIdx.x * blockDim.x + threadIdx.x;
+	int m = blockIdx.y * blockDim.y + threadIdx.y;
+	int n_ini = blockIdx.z * ini_red;
+	int n_max = fminf(n_ini + ini_red, N);
+	
+	if (m<M && t<T) {
+		half2 loc_sum = h2zeros;
+		half2 loc_tim = tim[t];		
+		for (int n=n_ini; n<n_max; n++) {
+			half2 amp_mp = __floats2half2_rn(amp[m*N+n], amp[m*N+n]);
+			half2 tau_mp = __floats2half2_rn(tau[m*N+n], tau[m*N+n]);
+			loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau_mp, loc_tim, Fs));
+		}
+		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
+	}
+}
+
+__global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, int M, int T, int N, int intRIR_N) {
+	extern __shared__ half2 sdata_mp[];
+	
+	int tid = threadIdx.x;
+	int n = blockIdx.x*(blockDim.x*2) + threadIdx.x;
+	int t = blockIdx.y;
+	int m = blockIdx.z;
+	
+	if (n+blockDim.x < N) sdata_mp[tid] = __hadd2(initialRIR[m*T*N + t*N + n], initialRIR[m*T*N + t*N + n+blockDim.x]);
+	else if (n<N) sdata_mp[tid] = initialRIR[m*T*N + t*N + n];
+	else sdata_mp[tid] = h2zeros;
+	__syncthreads();
+	
+	for (int s=blockDim.x/2; s>0; s>>=1) {
+		if (tid < s) sdata_mp[tid] = __hadd2(sdata_mp[tid], sdata_mp[tid+s]);
+		__syncthreads();
+	}
+	
+	if (tid==0) {
+		intermediateRIR[m*T*intRIR_N + t*intRIR_N + blockIdx.x] = sdata_mp[0];
+	}
+}
+
+__global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M, int T) {
+	int t = blockIdx.x * blockDim.x + threadIdx.x;
+	int m = blockIdx.y * blockDim.y + threadIdx.y;
+	
+	if (t<T && m<M) {
+		floatRIR[m*2*T + 2*t] = __low2float(h2RIR[m*T + t]);
+		floatRIR[m*2*T + 2*t+1] = __high2float(h2RIR[m*T + t]);
+	}
+}
+
+#endif
+
+/***************************/
 /* Auxiliar host functions */
 /***************************/
 
-scalar_t* gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
 	int initialReduction = initialReductionMin;
 	while (M * T * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
 	
@@ -386,9 +483,57 @@ scalar_t* gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* a
 	gpuErrchk( cudaDeviceSynchronize() );
 	gpuErrchk( cudaPeekAtLastError() );
 	gpuErrchk( cudaFree(initialRIR) );
-	
-	return rir;
 }
+
+#if __CUDA_ARCH__ >= 530
+void cuda_rirGenerator_mp(scalar_t* rir, half2* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+	int initialReduction = gpuRIR_cuda::initialReductionMin;
+	while (M * T/2 * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
+	
+	int iniRIR_N = ceil((float)N/initialReduction);
+	dim3 threadsPerBlockIni(gpuRIR_cuda::nThreadsGen_t, gpuRIR_cuda::nThreadsGen_m, gpuRIR_cuda::nThreadsGen_n);
+	dim3 numBlocksIni(ceil((float)T/2/threadsPerBlockIni.x), ceil((float)M/threadsPerBlockIni.y), iniRIR_N);
+	
+	half2* initialRIR;
+	gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
+	
+	generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, x, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Fs );
+	gpuErrchk( cudaDeviceSynchronize() );
+	gpuErrchk( cudaPeekAtLastError() );
+	
+	dim3 threadsPerBlockRed(gpuRIR_cuda::nThreadsRed, 1, 1);
+	half2* intermediateRIR;
+	int intRIR_N;
+	while (iniRIR_N > 2*gpuRIR_cuda::nThreadsRed) {		
+		intRIR_N = ceil((float)iniRIR_N / (2*gpuRIR_cuda::nThreadsRed));
+		gpuErrchk( cudaMalloc(&intermediateRIR, intRIR_N * T/2 * M * sizeof(half2)) );
+
+		dim3 numBlocksRed(intRIR_N, T/2, M);
+		reduceRIR_mp_kernel<<<numBlocksRed, threadsPerBlockRed, gpuRIR_cuda::nThreadsRed*sizeof(half2)>>>(
+			initialRIR, intermediateRIR, M, T/2, iniRIR_N, intRIR_N);
+		gpuErrchk( cudaDeviceSynchronize() );
+		gpuErrchk( cudaPeekAtLastError() );
+		
+		gpuErrchk( cudaFree(initialRIR) );
+		initialRIR = intermediateRIR;		
+		iniRIR_N = intRIR_N;
+	}
+	
+	gpuErrchk( cudaMalloc(&intermediateRIR, M * T/2 * sizeof(half2)) );
+	dim3 numBlocksEnd(1, T/2, M);
+	reduceRIR_mp_kernel<<<numBlocksEnd, threadsPerBlockRed, gpuRIR_cuda::nThreadsRed*sizeof(half2)>>>(
+		initialRIR, intermediateRIR, M, T/2, iniRIR_N, 1);
+	gpuErrchk( cudaDeviceSynchronize() );
+	gpuErrchk( cudaPeekAtLastError() );
+	gpuErrchk( cudaFree(initialRIR) );
+	
+	dim3 numBlocks(ceil((float)(T/2)/128), M, 1);
+	dim3 threadsPerBlock(128, 1, 1);
+	h2RIR_to_floatRIR_kernel<<<numBlocks, threadsPerBlock>>>(intermediateRIR, rir, M, T/2);
+		
+	gpuErrchk( cudaFree(intermediateRIR) );
+}
+#endif
 
 int gpuRIR_cuda::PadData(scalar_t *signal, scalar_t **padded_signal, int segment_len,
 						 scalar_t *RIR, scalar_t **padded_RIR, int M_src, int M_rcv, int RIR_len) {
@@ -489,7 +634,18 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	int N = nb_img[0] * nb_img[1] * nb_img[2];
 	scalar_t* rirISM;
 	gpuErrchk( cudaMalloc(&rirISM, M*nSamplesISM*sizeof(scalar_t)) );
-	cuda_rirGenerator(rirISM, time, amp, tau, M, N, nSamplesISM, Fs);
+	if (mixed_precision) {	
+		#if __CUDA_ARCH__ >= 530
+			half2* h2time;
+			gpuErrchk( cudaMalloc(&h2time, nSamples/2*sizeof(half2)) );
+			generateTime_mp_kernel<<<ceil((float)(nSamples/2)/nThreadsTime), nThreadsTime>>>(h2time, Fs, nSamples);		
+			cuda_rirGenerator_mp(rirISM, h2time, amp, tau, M, N, nSamplesISM, Fs);
+		#else
+			printf("The mixed precision requires Pascal GPU architecture or higher.\n");
+		#endif
+	} else {
+		cuda_rirGenerator(rirISM, time, amp, tau, M, N, nSamplesISM, Fs);
+	}
 	
 	// Compute the exponential power envelope parammeters of each RIR
 	dim3 threadsPerBlockEnvPred(nThreadsEnvPred_x, nThreadsEnvPred_y, nThreadsEnvPred_z);
@@ -664,7 +820,7 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 	return convolved_segments;
 }
 
-gpuRIR_cuda::gpuRIR_cuda(bool mPrecision=false) {	
+gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
 	activate_mixed_precision(mPrecision);
 	
 	// Initiate CUDA runtime API
@@ -673,12 +829,12 @@ gpuRIR_cuda::gpuRIR_cuda(bool mPrecision=false) {
 	gpuErrchk( cudaFree(memPtr_warmup) );
 	
 	// Initiate cuFFT library
-    cufftHandle plan_warmup;
-    gpuErrchk( cufftPlan1d(&plan_warmup,  1024, CUFFT_R2C, 1) );
+	cufftHandle plan_warmup;
+	gpuErrchk( cufftPlan1d(&plan_warmup,  1024, CUFFT_R2C, 1) );
 	gpuErrchk( cufftDestroy(plan_warmup) );
 	
 	// Initialize cuRAND generator
-    gpuErrchk( curandCreateGenerator(&cuRandGenWrap.gen, CURAND_RNG_PSEUDO_DEFAULT) );
+	gpuErrchk( curandCreateGenerator(&cuRandGenWrap.gen, CURAND_RNG_PSEUDO_DEFAULT) );
 	gpuErrchk( curandSetPseudoRandomGeneratorSeed(cuRandGenWrap.gen, 1234ULL) );
 }
 

@@ -64,6 +64,6 @@ class gpuRIR_cuda {
 		bool mixed_precision;
 		
 		// Auxiliar host functions
-		scalar_t* cuda_rirGenerator(scalar_t*, scalar_t*, scalar_t*, scalar_t*, int, int, int, scalar_t);
+		void cuda_rirGenerator(scalar_t*, scalar_t*, scalar_t*, scalar_t*, int, int, int, scalar_t);
 		int PadData(scalar_t*, scalar_t**, int, scalar_t*, scalar_t**, int, int, int);
 };
