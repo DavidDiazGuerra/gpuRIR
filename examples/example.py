@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 
 import gpuRIR
+# gpuRIR.activate_mixed_precision()
 
 room_sz = [3,3,2.5]  # Size of the room [m]
 nb_src = 2  # Number of sources

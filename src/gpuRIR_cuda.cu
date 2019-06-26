@@ -55,13 +55,14 @@ cuRandGeneratorWrapper_t gpuRIR_cuda::cuRandGenWrap;
 int cuda_arch;
 
 
-#if __CUDA_ARCH__ >= 530
-// Useful half2 constants
-static const half2 h2zeros = __floats2half2_rn(0.0, 0.0);
-static const half2 h2ones = __floats2half2_rn(1.0, 1.0);
-static const half2 h2twos = __floats2half2_rn(2.0, 2.0);
-static const half2 h2pis = __floats2half2_rn(PI, PI);
-#endif
+// #if __CUDA_ARCH__ >= 530
+// // Useful half2 constants
+// static const half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+// static const half2 h2ones = __floats2half2_rn(1.0, 1.0);
+// static const half2 h2twos = __floats2half2_rn(2.0, 2.0);
+// static const half2 h2pis = __floats2half2_rn(PI, PI);
+// static const half2 Tw = __floats2half2_rn(8e-3f, 8e-3f); // Window duration [s]
+// #endif
 
 /***************************/
 /* Auxiliar host functions */
@@ -169,20 +170,31 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
 #if __CUDA_ARCH__ >= 530
 
 __device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 Tw) {
-	return __hdiv2(hadd2(h2ones, h2cos(__hdiv2(__hmul2(__hmul2(h2twos, h2pis), t), Tw))), h2twos);
+	half2 h2ones = __floats2half2_rn(1.0, 1.0);
+	half2 h2twos = __floats2half2_rn(2.0, 2.0);
+	half2 h2pis = __floats2half2_rn(PI, PI);
+	
+	return __h2div(__hadd2(h2ones, h2cos(__h2div(__hmul2(__hmul2(h2twos, h2pis), t), Tw))), h2twos);
 }
 
-__device__ __forceinline__ scalar_t sinc_mp(half2 x) {
-	return __hfma2(__hdiv2(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
+__device__ __forceinline__ half2 sinc_mp(half2 x) {
+	half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+	
+	return __hfma2(__h2div(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
 }
 
-__device__ __forceinline__ scalar_t image_sample_mp(half2 amp, half2 tau, half2 t, scalar_t Fs) {
-	static const half2 Tw = __floats2half2_rn(8e-3f, 8e-3f); // Window duration [s]
+__device__ __forceinline__ half2 image_sample_mp(half2 amp, half2 tau, half2 t, scalar_t Fs) {
+	// static const half2 Tw = __floats2half2_rn(8e-3f, 8e-3f); // Window duration [s]
+	half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+	half2 h2ones = __floats2half2_rn(1.0, 1.0);
+	half2 h2twos = __floats2half2_rn(2.0, 2.0);
+	half2 h2pis = __floats2half2_rn(PI, PI);
+	half2 Tw = __floats2half2_rn(8e-3f, 8e-3f);
 	
 	half2 FsPI = __hmul2( __floats2half2_rn(Fs, Fs), h2pis);
 	half2 t_tau = __hsub2(t, tau);
 	t_tau = __hmul2(t_tau, __hsub2(__hge2(t_tau, h2zeros), h2ones)); //habs2 does not exist
-	bool close_to_center = __hble2(t_tau, __hdiv2(Tw, h2twos));
+	bool close_to_center = __hble2(t_tau, __h2div(Tw, h2twos));
 	return close_to_center? __hmul2(hanning_window_mp(t_tau, Tw), __hmul2(amp, sinc_mp( __hmul2((t_tau), FsPI) ))) : h2zeros;
 }
 
@@ -427,6 +439,8 @@ __global__ void generateTime_mp_kernel( half2* t, scalar_t Fs, int nSamples) {
 
 __global__ void generateRIR_mp_kernel(half2* initialRIR, half2* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {
 	#if __CUDA_ARCH__ >= 530	
+		half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+		
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
 		int m = blockIdx.y * blockDim.y + threadIdx.y;
 		int n_ini = blockIdx.z * ini_red;
@@ -450,7 +464,9 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, half2* tim, scalar_t* a
 __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, int M, int T, int N, int intRIR_N) {
 	extern __shared__ half2 sdata_mp[];
 	
-	#if __CUDA_ARCH__ >= 530	
+	#if __CUDA_ARCH__ >= 530
+		half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+		
 		int tid = threadIdx.x;
 		int n = blockIdx.x*(blockDim.x*2) + threadIdx.x;
 		int t = blockIdx.y;

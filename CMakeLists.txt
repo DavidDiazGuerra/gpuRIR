@@ -23,6 +23,8 @@ set_target_properties(gpuRIRcu PROPERTIES
     # CUDA_SEPARABLE_COMPILATION ON
 )
 
+target_compile_options(gpuRIRcu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_60,code=sm_60>)
+
 add_library(gpuRIR_bind MODULE
     src/python_bind.cpp
 )
