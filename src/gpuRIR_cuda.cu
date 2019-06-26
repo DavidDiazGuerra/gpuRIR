@@ -174,13 +174,18 @@ __device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 Tw) {
 	half2 h2twos = __floats2half2_rn(2.0, 2.0);
 	half2 h2pis = __floats2half2_rn(PI, PI);
 	
-	return __h2div(__hadd2(h2ones, h2cos(__h2div(__hmul2(__hmul2(h2twos, h2pis), t), Tw))), h2twos);
+	return h2div(__hadd2(h2ones, h2cos(h2div(__hmul2(__hmul2(h2twos, h2pis), t), Tw))), h2twos);
 }
 
 __device__ __forceinline__ half2 sinc_mp(half2 x) {
 	half2 h2zeros = __floats2half2_rn(0.0, 0.0);
+	half2 h2ones = __floats2half2_rn(1.0, 1.0);
 	
-	return __hfma2(__h2div(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
+	half2 sinc = h2div(h2sin(x), x);
+	half2 isnan = __hisnan2(sinc);
+	if (__low2float(isnan)) sinc = __floats2half2_rn(1.0, __high2float(sinc));
+	if (__high2float(isnan)) sinc = __floats2half2_rn(__low2float(sinc), 1.0);
+	return sinc; //__hfma2(h2div(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
 }
 
 __device__ __forceinline__ half2 image_sample_mp(half2 amp, half2 tau, half2 t, scalar_t Fs) {
@@ -193,8 +198,8 @@ __device__ __forceinline__ half2 image_sample_mp(half2 amp, half2 tau, half2 t, 
 	
 	half2 FsPI = __hmul2( __floats2half2_rn(Fs, Fs), h2pis);
 	half2 t_tau = __hsub2(t, tau);
-	t_tau = __hmul2(t_tau, __hsub2(__hge2(t_tau, h2zeros), h2ones)); //habs2 does not exist
-	bool close_to_center = __hble2(t_tau, __h2div(Tw, h2twos));
+	t_tau = __hmul2(t_tau, __hsub2(__hmul2(__hge2(t_tau, h2zeros), h2twos), h2ones)); //habs2 does not exist
+	bool close_to_center = __hble2(t_tau, h2div(Tw, h2twos));
 	return close_to_center? __hmul2(hanning_window_mp(t_tau, Tw), __hmul2(amp, sinc_mp( __hmul2((t_tau), FsPI) ))) : h2zeros;
 }
 
