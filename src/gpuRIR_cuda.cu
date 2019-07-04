@@ -55,14 +55,11 @@ cuRandGeneratorWrapper_t gpuRIR_cuda::cuRandGenWrap;
 int cuda_arch;
 
 
-// #if __CUDA_ARCH__ >= 530
-// // Useful half2 constants
-// static const half2 h2zeros = __floats2half2_rn(0.0, 0.0);
-// static const half2 h2ones = __floats2half2_rn(1.0, 1.0);
-// static const half2 h2twos = __floats2half2_rn(2.0, 2.0);
-// static const half2 h2pis = __floats2half2_rn(PI, PI);
-// static const half2 Tw = __floats2half2_rn(8e-3f, 8e-3f); // Window duration [s]
-// #endif
+#if __CUDA_ARCH__ >= 530
+#define h2zeros __float2half2_rn(0.0)
+#define h2ones __float2half2_rn(1.0)
+#endif
+
 
 /***************************/
 /* Auxiliar host functions */
@@ -169,38 +166,34 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
 /*********************************************/
 #if __CUDA_ARCH__ >= 530
 
-__device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 Tw) {
-	half2 h2ones = __floats2half2_rn(1.0, 1.0);
-	half2 h2twos = __floats2half2_rn(2.0, 2.0);
-	half2 h2pis = __floats2half2_rn(PI, PI);
-	
-	return h2div(__hadd2(h2ones, h2cos(h2div(__hmul2(__hmul2(h2twos, h2pis), t), Tw))), h2twos);
+__device__ __forceinline__ half2 h2abs(half2 x) {
+	uint32_t i = *reinterpret_cast<uint32_t*>(&x) & 0x7FFF7FFF;
+	return *reinterpret_cast<half2*>( &i );
 }
 
-__device__ __forceinline__ half2 sinc_mp(half2 x) {
-	half2 h2zeros = __floats2half2_rn(0.0, 0.0);
-	half2 h2ones = __floats2half2_rn(1.0, 1.0);
-	
-	half2 sinc = h2div(h2sin(x), x);
-	half2 isnan = __hisnan2(sinc);
-	if (__low2float(isnan)) sinc = __floats2half2_rn(1.0, __high2float(sinc));
-	if (__high2float(isnan)) sinc = __floats2half2_rn(__low2float(sinc), 1.0);
-	return sinc; //__hfma2(h2div(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
+__device__ __forceinline__ half2 hanning_window_mp(half2 t) {	
+	return __hmul2(__hadd2(h2ones, h2cos(__hmul2(__float2half2_rn(2*PI/8e-3f), t))), __float2half2_rn(0.5f));
 }
 
-__device__ __forceinline__ half2 image_sample_mp(half2 amp, half2 tau, half2 t, scalar_t Fs) {
-	// static const half2 Tw = __floats2half2_rn(8e-3f, 8e-3f); // Window duration [s]
-	half2 h2zeros = __floats2half2_rn(0.0, 0.0);
-	half2 h2ones = __floats2half2_rn(1.0, 1.0);
-	half2 h2twos = __floats2half2_rn(2.0, 2.0);
-	half2 h2pis = __floats2half2_rn(PI, PI);
-	half2 Tw = __floats2half2_rn(8e-3f, 8e-3f);
-	
-	half2 FsPI = __hmul2( __floats2half2_rn(Fs, Fs), h2pis);
-	half2 t_tau = __hsub2(t, tau);
-	t_tau = __hmul2(t_tau, __hsub2(__hmul2(__hge2(t_tau, h2zeros), h2twos), h2ones)); //habs2 does not exist
-	bool close_to_center = __hble2(t_tau, h2div(Tw, h2twos));
-	return close_to_center? __hmul2(hanning_window_mp(t_tau, Tw), __hmul2(amp, sinc_mp( __hmul2((t_tau), FsPI) ))) : h2zeros;
+__device__ __forceinline__ half2 sinc_mp(half2 x) {	
+	// half2 sinc = __h2div(/*h2sin*/(x), x);
+	// if (__hbeq2(x, h2zeros)) {
+		// half2 isnan = __hisnan2(sinc);
+		// if (__low2float(isnan)) sinc = __floats2half2_rn(1.0, __high2float(sinc));
+		// if (__high2float(isnan)) sinc = __floats2half2_rn(__low2float(sinc), 1.0);
+		// // if (__low2float(isnan)) sinc = __highs2half2(h2ones, sinc);
+		// // if (__high2float(isnan)) sinc = __lows2half2(sinc, h2ones);
+	// }
+	// return sinc; //__hfma2(__h2div(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
+	return __floats2half2_rn(sinc(__low2float(x)), sinc(__high2float(x)));
+}
+
+__device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, scalar_t Fs) {
+	half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);  // __hsub2(t, tau);
+	if (__hble2(h2abs(t_tau), __float2half2_rn(8e-3f/2))) {
+		half2 FsPI = __hmul2( __float2half2_rn(Fs), __float2half2_rn(PI));
+		return __hmul2(hanning_window_mp(t_tau), __hmul2(amp, sinc_mp( __hmul2((t_tau), FsPI) )));
+	} else return h2zeros;
 }
 
 #endif
@@ -321,7 +314,7 @@ __global__ void generateTime_kernel(scalar_t* t, scalar_t Fs, int nSamples) {
 	if (sample<nSamples) t[sample] = sample/Fs;
 }
 
-__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {	
+__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	int n_ini = blockIdx.z * ini_red;
@@ -433,19 +426,8 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 /* Mixed precision KERNELS */
 /***************************/
 
-__global__ void generateTime_mp_kernel( half2* t, scalar_t Fs, int nSamples) {
+__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {
 	#if __CUDA_ARCH__ >= 530
-		int sample1 = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
-		if (sample1<nSamples) t[sample1/2] = __floats2half2_rn(sample1/Fs, (sample1+1)/Fs);
-	#else
-		printf("Mixed precision requires Pascal GPU architecture or higher.\n");
-	#endif
-}
-
-__global__ void generateRIR_mp_kernel(half2* initialRIR, half2* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {
-	#if __CUDA_ARCH__ >= 530	
-		half2 h2zeros = __floats2half2_rn(0.0, 0.0);
-		
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
 		int m = blockIdx.y * blockDim.y + threadIdx.y;
 		int n_ini = blockIdx.z * ini_red;
@@ -453,11 +435,11 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, half2* tim, scalar_t* a
 		
 		if (m<M && t<T) {
 			half2 loc_sum = h2zeros;
-			half2 loc_tim = tim[t];		
+			scalar_t loc_tim_1 = tim[2*t];
+			scalar_t loc_tim_2 = tim[2*t+1];
 			for (int n=n_ini; n<n_max; n++) {
-				half2 amp_mp = __floats2half2_rn(amp[m*N+n], amp[m*N+n]);
-				half2 tau_mp = __floats2half2_rn(tau[m*N+n], tau[m*N+n]);
-				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau_mp, loc_tim, Fs));
+				half2 amp_mp = __float2half2_rn(amp[m*N+n]);
+				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau[m*N+n], loc_tim_1, loc_tim_2, Fs));
 			}
 			initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 		}
@@ -468,10 +450,7 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, half2* tim, scalar_t* a
 
 __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, int M, int T, int N, int intRIR_N) {
 	extern __shared__ half2 sdata_mp[];
-	
 	#if __CUDA_ARCH__ >= 530
-		half2 h2zeros = __floats2half2_rn(0.0, 0.0);
-		
 		int tid = threadIdx.x;
 		int n = blockIdx.x*(blockDim.x*2) + threadIdx.x;
 		int t = blockIdx.y;
@@ -496,7 +475,6 @@ __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, i
 }
 
 __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M, int T) {
-	
 	#if __CUDA_ARCH__ >= 530	
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
@@ -555,7 +533,7 @@ void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, s
 	gpuErrchk( cudaFree(initialRIR) );
 }
 
-void cuda_rirGenerator_mp(scalar_t* rir, half2* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
 	if (cuda_arch >= 530) {
 		int initialReduction = initialReductionMin;
 		while (M * T/2 * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
@@ -707,11 +685,8 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	scalar_t* rirISM;
 	gpuErrchk( cudaMalloc(&rirISM, M*nSamplesISM*sizeof(scalar_t)) );
 	if (mixed_precision) {	
-		if (cuda_arch >= 530) {
-			half2* h2time;
-			gpuErrchk( cudaMalloc(&h2time, nSamples/2*sizeof(half2)) );
-			generateTime_mp_kernel<<<ceil((float)(nSamples/2)/nThreadsTime), nThreadsTime>>>(h2time, Fs, nSamples);		
-			cuda_rirGenerator_mp(rirISM, h2time, amp, tau, M, N, nSamplesISM, Fs);
+		if (cuda_arch >= 530) {	
+			cuda_rirGenerator_mp(rirISM, time, amp, tau, M, N, nSamplesISM, Fs);
 		} else {
 			printf("The mixed precision requires Pascal GPU architecture or higher.\n");
 		}
