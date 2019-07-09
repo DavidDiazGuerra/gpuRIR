@@ -673,7 +673,9 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	
 	// Generate a vector with the time instant of each sample
 	int nSamplesISM = ceil(Tdiff*Fs);
+	nSamplesISM += nSamplesISM%2; // nSamplesISM must be even
 	int nSamples = ceil(Tmax*Fs);
+	nSamples += nSamples%2; // nSamples must be even
 	int nSamplesDiff = nSamples - nSamplesISM;
 	scalar_t* time;
 	gpuErrchk( cudaMalloc(&time, nSamples*sizeof(scalar_t)) );

@@ -66,6 +66,7 @@ py::array gpuRIR_bind::simulateRIR_bind(std::vector<scalar_t> room_sz, // Size o
 	});
 	
 	int nSamples = ceil(Tmax*Fs);
+	nSamples += nSamples%2; // nSamples must be even
 	std::vector<int> shape = {M_src, M_rcv, nSamples};
 	std::vector<size_t> strides = {M_rcv*nSamples*sizeof(scalar_t), nSamples*sizeof(scalar_t), sizeof(scalar_t)};
 	return py::array_t<scalar_t>(shape, strides, rir, free_when_done);
