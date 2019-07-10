@@ -171,28 +171,28 @@ __device__ __forceinline__ half2 h2abs(half2 x) {
 	return *reinterpret_cast<half2*>( &i );
 }
 
+__device__ __forceinline__ half2 my_h2sin(half2 x) {
+	return __floats2half2_rn(sinf(__low2float(x)), sinf(__high2float(x)));
+}
+
+__device__ __forceinline__ half2 my_h2cos(half2 x) {
+	return __floats2half2_rn(cosf(__low2float(x)), cosf(__high2float(x)));
+}
+
 __device__ __forceinline__ half2 hanning_window_mp(half2 t) {	
 	return __hmul2(__hadd2(h2ones, h2cos(__hmul2(__float2half2_rn(2*PI/8e-3f), t))), __float2half2_rn(0.5f));
 }
 
-__device__ __forceinline__ half2 sinc_mp(half2 x) {	
-	// half2 sinc = __h2div(/*h2sin*/(x), x);
-	// if (__hbeq2(x, h2zeros)) {
-		// half2 isnan = __hisnan2(sinc);
-		// if (__low2float(isnan)) sinc = __floats2half2_rn(1.0, __high2float(sinc));
-		// if (__high2float(isnan)) sinc = __floats2half2_rn(__low2float(sinc), 1.0);
-		// // if (__low2float(isnan)) sinc = __highs2half2(h2ones, sinc);
-		// // if (__high2float(isnan)) sinc = __lows2half2(sinc, h2ones);
-	// }
-	// return sinc; //__hfma2(__h2div(h2sin(x), x), __hne2(x, h2zeros), __heq2(x, h2zeros));
-	return __floats2half2_rn(sinc(__low2float(x)), sinc(__high2float(x)));
+__device__ __forceinline__ half2 my_h2sinc(half2 x) {
+	x = __hfma2(__heq2(x, h2zeros), __float2half2_rn(1e-7f), x);
+	return __h2div(my_h2sin(x), x);
 }
 
 __device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, scalar_t Fs) {
 	half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);  // __hsub2(t, tau);
 	if (__hble2(h2abs(t_tau), __float2half2_rn(8e-3f/2))) {
 		half2 FsPI = __hmul2( __float2half2_rn(Fs), __float2half2_rn(PI));
-		return __hmul2(hanning_window_mp(t_tau), __hmul2(amp, sinc_mp( __hmul2((t_tau), FsPI) )));
+		return __hmul2(hanning_window_mp(t_tau), __hmul2(amp, my_h2sinc( __hmul2(t_tau, FsPI) )));
 	} else return h2zeros;
 }
 
@@ -480,7 +480,7 @@ __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	
 	if (t<T && m<M) {
-		floatRIR[m*2*T + 2*t] = __low2float(h2RIR[m*T + t]);
+		floatRIR[m*2*T + 2*t  ] =  __low2float(h2RIR[m*T + t]);
 		floatRIR[m*2*T + 2*t+1] = __high2float(h2RIR[m*T + t]);
 	}
 	#else
