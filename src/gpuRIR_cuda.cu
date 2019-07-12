@@ -112,12 +112,12 @@ __device__ __forceinline__ scalar_t hanning_window(scalar_t t, scalar_t Tw) {
 }
 
 __device__ __forceinline__ scalar_t sinc(scalar_t x) {
-	return (x==0)? 1 : sinf(x)/x; 
+	return (x==0)? 1 : sinf(x)/x;
 }
 
-__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, scalar_t Fs) {
-	scalar_t Tw = 8e-3f; // Window duration [s]
-	return (abs(t-tau)<Tw/2)? hanning_window(t-tau, Tw) * amp * sinc( (t - tau) * Fs * PI ) : 0.0f;
+__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, scalar_t Tw) {
+	scalar_t t_tau = t - tau;
+	return (abs(t_tau)<Tw/2)? hanning_window(t_tau, Tw) * amp * sinc( (t_tau) * PI ) : 0.0f;
 }
 
 __device__ __forceinline__ scalar_t SabineT60( scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
@@ -179,7 +179,7 @@ __device__ __forceinline__ half2 my_h2cos(half2 x) {
 	return __floats2half2_rn(cosf(__low2float(x)), cosf(__high2float(x)));
 }
 
-__device__ __forceinline__ half2 hanning_window_mp(half2 t) {	
+__device__ __forceinline__ half2 hanning_window_mp(half2 t) {
 	return __hmul2(__hadd2(h2ones, h2cos(__hmul2(__float2half2_rn(2*PI/8e-3f), t))), __float2half2_rn(0.5f));
 }
 
@@ -209,7 +209,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 								  micPattern mic_pattern, scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
 								  scalar_t beta_x1, scalar_t beta_x2, scalar_t beta_y1, scalar_t beta_y2, scalar_t beta_z1, scalar_t beta_z2, 
 								  int nb_img_x, int nb_img_y, int nb_img_z,
-								  int M_src, int M_rcv, scalar_t c) {	
+								  int M_src, int M_rcv, scalar_t c, scalar_t Fs) {
 	
 	extern __shared__ scalar_t sdata[];
 		
@@ -301,9 +301,9 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 				scalar_t amp = rflx_att / (4*PI*dist);
 				amp *= mic_directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern);
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
-				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c;
+				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
 
-				if (direct_path) g_tau_dp[m_src*M_rcv + m_rcv] = dist / c;
+				if (direct_path) g_tau_dp[m_src*M_rcv + m_rcv] = dist / c * Fs;
 			}
 		}
 	}
@@ -314,7 +314,7 @@ __global__ void generateTime_kernel(scalar_t* t, scalar_t Fs, int nSamples) {
 	if (sample<nSamples) t[sample] = sample/Fs;
 }
 
-__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* tim, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {
+__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Tw) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	int n_ini = blockIdx.z * ini_red;
@@ -322,9 +322,8 @@ __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* tim, scalar_t
 	
 	if (m<M && t<T) {
 		scalar_t loc_sum = 0;
-		scalar_t loc_tim = tim[t];		
 		for (int n=n_ini; n<n_max; n++) {
-			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], loc_tim, Fs);
+			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], /* loc_tim */ t, Tw);
 		}
 		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 	}
@@ -355,18 +354,18 @@ __global__ void reduceRIR_kernel(scalar_t* initialRIR, scalar_t* intermediateRIR
 
 __global__ void envPred_kernel(scalar_t* A /*[M_src]M_rcv]*/, scalar_t* alpha /*[M_src]M_rcv]*/, 
 						scalar_t* RIRs_early /*[M_src][M_rcv][nSamples]*/, scalar_t* tau_dp, /*[M_src]M_rcv]*/
-						int M_src, int M_rcv, int nSamples, scalar_t fs,
+						int M_src, int M_rcv, int nSamples, scalar_t Fs,
 						scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
 						scalar_t beta_x1, scalar_t beta_x2, scalar_t beta_y1, scalar_t beta_y2, scalar_t beta_z1, scalar_t beta_z2) {
 		
-	scalar_t w_sz = 10e-3f; // Maximum window size (s) to compute the final power of the early RIRs_early
+	scalar_t w_sz = 10e-3f * Fs; // Maximum window size (samples) to compute the final power of the early RIRs_early
 	
 	int m_src = blockIdx.x * blockDim.x + threadIdx.x;
 	int m_rcv = blockIdx.y * blockDim.y + threadIdx.y;
 	
 	if (m_src<M_src && m_rcv<M_rcv) {
-		int w_start = __float2int_ru( max(nSamples/fs-w_sz, tau_dp[m_src*M_rcv+m_rcv]) * fs );
-		scalar_t w_center = (w_start + (nSamples-w_start)/2.0) / fs;
+		int w_start = __float2int_ru( max(nSamples-w_sz, tau_dp[m_src*M_rcv+m_rcv]));
+		scalar_t w_center = (w_start + (nSamples-w_start)/2.0);
 		
 		scalar_t finalPower = 0.0f;
 		for (int t=w_start; t<nSamples; t++) {
@@ -376,28 +375,28 @@ __global__ void envPred_kernel(scalar_t* A /*[M_src]M_rcv]*/, scalar_t* alpha /*
 		finalPower /= nSamples-w_start;
 		
 		scalar_t T60 = SabineT60(room_sz_x, room_sz_y, room_sz_z, beta_x1, beta_x2, beta_y1, beta_y2, beta_z1, beta_z2);
-		scalar_t loc_alpha = -13.8155f / T60; //-13.8155 == log(10^(-6))
+		scalar_t loc_alpha = -13.8155f / (T60 * Fs); //-13.8155 == log(10^(-6))
 		
 		A[m_src*M_rcv + m_rcv] = finalPower / expf(loc_alpha*(w_center-tau_dp[m_src*M_rcv+m_rcv]));
 		alpha[m_src*M_rcv + m_rcv] = loc_alpha;
 	}
 }
 
-__global__ void diffRev_kernel(scalar_t* rir, scalar_t* tim, scalar_t* A, scalar_t* alpha, scalar_t* tau_dp, 
-							   int M_src, int M_rcv, int nSamples) {
+__global__ void diffRev_kernel(scalar_t* rir, scalar_t* A, scalar_t* alpha, scalar_t* tau_dp,
+							   int M_src, int M_rcv, int nSamplesISM, int nSamplesDiff) {
 	
 	int sample = blockIdx.x * blockDim.x + threadIdx.x;
 	int m_src  = blockIdx.y * blockDim.y + threadIdx.y;
 	int m_rcv  = blockIdx.z * blockDim.z + threadIdx.z;
 	
-	if (sample<nSamples && m_src<M_src && m_rcv<M_rcv) {
+	if (sample<nSamplesDiff && m_src<M_src && m_rcv<M_rcv) {
 		// Get logistic distribution from uniform distribution
-		scalar_t uniform = rir[m_src*M_rcv*nSamples + m_rcv*nSamples + sample];
+		scalar_t uniform = rir[m_src*M_rcv*nSamplesDiff + m_rcv*nSamplesDiff + sample];
 		scalar_t logistic = 0.551329f * logf(uniform/(1.0f - uniform + 1e-6)); // 0.551329 == sqrt(3)/pi
 		
 		// Apply power envelope
-		scalar_t pow_env = A[m_src*M_rcv+m_rcv] * expf(alpha[m_src*M_rcv+m_rcv] * (tim[sample]-tau_dp[m_src*M_rcv+m_rcv]));
-		rir[m_src*M_rcv*nSamples + m_rcv*nSamples + sample] = sqrt(pow_env) * logistic;
+		scalar_t pow_env = A[m_src*M_rcv+m_rcv] * expf(alpha[m_src*M_rcv+m_rcv] * (nSamplesISM+sample-tau_dp[m_src*M_rcv+m_rcv]));
+		rir[m_src*M_rcv*nSamplesDiff + m_rcv*nSamplesDiff + sample] = sqrt(pow_env) * logistic;
 	}
 }
 
@@ -432,7 +431,7 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* tim, scalar_t
 		int m = blockIdx.y * blockDim.y + threadIdx.y;
 		int n_ini = blockIdx.z * ini_red;
 		int n_max = fminf(n_ini + ini_red, N);
-		
+
 		if (m<M && t<T) {
 			half2 loc_sum = h2zeros;
 			scalar_t loc_tim_1 = tim[2*t];
@@ -455,17 +454,17 @@ __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, i
 		int n = blockIdx.x*(blockDim.x*2) + threadIdx.x;
 		int t = blockIdx.y;
 		int m = blockIdx.z;
-		
+
 		if (n+blockDim.x < N) sdata_mp[tid] = __hadd2(initialRIR[m*T*N + t*N + n], initialRIR[m*T*N + t*N + n+blockDim.x]);
 		else if (n<N) sdata_mp[tid] = initialRIR[m*T*N + t*N + n];
 		else sdata_mp[tid] = h2zeros;
 		__syncthreads();
-		
+
 		for (int s=blockDim.x/2; s>0; s>>=1) {
 			if (tid < s) sdata_mp[tid] = __hadd2(sdata_mp[tid], sdata_mp[tid+s]);
 			__syncthreads();
 		}
-		
+
 		if (tid==0) {
 			intermediateRIR[m*T*intRIR_N + t*intRIR_N + blockIdx.x] = sdata_mp[0];
 		}
@@ -475,10 +474,10 @@ __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, i
 }
 
 __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M, int T) {
-	#if __CUDA_ARCH__ >= 530	
+	#if __CUDA_ARCH__ >= 530
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
-	
+
 	if (t<T && m<M) {
 		floatRIR[m*2*T + 2*t  ] =  __low2float(h2RIR[m*T + t]);
 		floatRIR[m*2*T + 2*t+1] = __high2float(h2RIR[m*T + t]);
@@ -492,7 +491,7 @@ __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M
 /* Auxiliar host functions */
 /***************************/
 
-void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
 	int initialReduction = initialReductionMin;
 	while (M * T * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
 	
@@ -503,7 +502,8 @@ void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* x, scalar_t* amp, s
 	scalar_t* initialRIR;
 	gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(scalar_t)) );
 	
-	generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, x, amp, tau, T, M, N, iniRIR_N, initialReduction, Fs );
+	scalar_t Tw = 8e-3f * Fs; // Window duration [samples]
+	generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
 	gpuErrchk( cudaDeviceSynchronize() );
 	gpuErrchk( cudaPeekAtLastError() );
 	
@@ -537,22 +537,22 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* t
 	if (cuda_arch >= 530) {
 		int initialReduction = initialReductionMin;
 		while (M * T/2 * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
-		
+
 		int iniRIR_N = ceil((float)N/initialReduction);
 		dim3 threadsPerBlockIni(nThreadsGen_t, nThreadsGen_m, nThreadsGen_n);
 		dim3 numBlocksIni(ceil((float)T/2/threadsPerBlockIni.x), ceil((float)M/threadsPerBlockIni.y), iniRIR_N);
-		
+
 		half2* initialRIR;
 		gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
-		
+
 		generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, x, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Fs );
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
-		
+
 		dim3 threadsPerBlockRed(nThreadsRed, 1, 1);
 		half2* intermediateRIR;
 		int intRIR_N;
-		while (iniRIR_N > 2*nThreadsRed) {		
+		while (iniRIR_N > 2*nThreadsRed) {
 			intRIR_N = ceil((float)iniRIR_N / (2*nThreadsRed));
 			gpuErrchk( cudaMalloc(&intermediateRIR, intRIR_N * T/2 * M * sizeof(half2)) );
 
@@ -561,12 +561,12 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* t
 				initialRIR, intermediateRIR, M, T/2, iniRIR_N, intRIR_N);
 			gpuErrchk( cudaDeviceSynchronize() );
 			gpuErrchk( cudaPeekAtLastError() );
-			
+
 			gpuErrchk( cudaFree(initialRIR) );
-			initialRIR = intermediateRIR;		
+			initialRIR = intermediateRIR;
 			iniRIR_N = intRIR_N;
 		}
-		
+
 		gpuErrchk( cudaMalloc(&intermediateRIR, M * T/2 * sizeof(half2)) );
 		dim3 numBlocksEnd(1, T/2, M);
 		reduceRIR_mp_kernel<<<numBlocksEnd, threadsPerBlockRed, nThreadsRed*sizeof(half2)>>>(
@@ -574,11 +574,11 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* x, scalar_t* amp, scalar_t* t
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
 		gpuErrchk( cudaFree(initialRIR) );
-		
+
 		dim3 numBlocks(ceil((float)(T/2)/128), M, 1);
 		dim3 threadsPerBlock(128, 1, 1);
 		h2RIR_to_floatRIR_kernel<<<numBlocks, threadsPerBlock>>>(intermediateRIR, rir, M, T/2);
-			
+
 		gpuErrchk( cudaFree(intermediateRIR) );
 	} else {
 		printf("Mixed precision requires Pascal GPU architecture or higher.\n");
@@ -666,34 +666,30 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 		room_sz[0], room_sz[1], room_sz[2], 
 		beta[0], beta[1], beta[2], beta[3], beta[4], beta[5], 
 		nb_img[0], nb_img[1], nb_img[2],
-		M_src, M_rcv, c
+		M_src, M_rcv, c, Fs
 	);
 	gpuErrchk( cudaDeviceSynchronize() );
 	gpuErrchk( cudaPeekAtLastError() );
-	
-	// Generate a vector with the time instant of each sample
+
 	int nSamplesISM = ceil(Tdiff*Fs);
 	nSamplesISM += nSamplesISM%2; // nSamplesISM must be even
 	int nSamples = ceil(Tmax*Fs);
 	nSamples += nSamples%2; // nSamples must be even
 	int nSamplesDiff = nSamples - nSamplesISM;
-	scalar_t* time;
-	gpuErrchk( cudaMalloc(&time, nSamples*sizeof(scalar_t)) );
-	generateTime_kernel<<<ceil((float)nSamples/nThreadsTime), nThreadsTime>>>(time, Fs, nSamples);
 	
 	// Compute the RIRs as a sum of sincs
 	int M = M_src * M_rcv;
 	int N = nb_img[0] * nb_img[1] * nb_img[2];
 	scalar_t* rirISM;
 	gpuErrchk( cudaMalloc(&rirISM, M*nSamplesISM*sizeof(scalar_t)) );
-	if (mixed_precision) {	
-		if (cuda_arch >= 530) {	
+	if (mixed_precision) {
+		if (cuda_arch >= 530) {
 			cuda_rirGenerator_mp(rirISM, time, amp, tau, M, N, nSamplesISM, Fs);
 		} else {
 			printf("The mixed precision requires Pascal GPU architecture or higher.\n");
 		}
 	} else {
-		cuda_rirGenerator(rirISM, time, amp, tau, M, N, nSamplesISM, Fs);
+		cuda_rirGenerator(rirISM, amp, tau, M, N, nSamplesISM, Fs);
 	}
 	
 	// Compute the exponential power envelope parammeters of each RIR
@@ -727,7 +723,7 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 							  ceil((float)M_src / nThreadsDiff_src), 
 							  ceil((float)M_rcv / nThreadsDiff_rcv));
 		diffRev_kernel<<<numBlocksDiff, threadsPerBlockDiff>>>(
-				rirDiff, &time[nSamplesISM], A, alpha, tau_dp, M_src, M_rcv, nSamplesDiff);
+				rirDiff, A, alpha, tau_dp, M_src, M_rcv, nSamplesISM, nSamplesDiff);
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
 	}
@@ -768,7 +764,6 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	gpuErrchk( cudaFree(amp)	 );
 	gpuErrchk( cudaFree(tau)	 );
 	gpuErrchk( cudaFree(tau_dp)	 );
-	gpuErrchk( cudaFree(time)	 );
 	gpuErrchk( cudaFree(rirISM)	 );
 	gpuErrchk( cudaFree(A)		 );
 	gpuErrchk( cudaFree(alpha)	 );
@@ -871,11 +866,11 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 
 gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
 	activate_mixed_precision(mPrecision);
-	
+
 	cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
 	cuda_arch = prop.major*100 + prop.minor*10;
-	
+
 	// Initiate CUDA runtime API
 	scalar_t* memPtr_warmup;
 	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(scalar_t)) );
@@ -885,7 +880,7 @@ gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
 	cufftHandle plan_warmup;
 	gpuErrchk( cufftPlan1d(&plan_warmup,  1024, CUFFT_R2C, 1) );
 	gpuErrchk( cufftDestroy(plan_warmup) );
-	
+
 	// Initialize cuRAND generator
 	gpuErrchk( curandCreateGenerator(&cuRandGenWrap.gen, CURAND_RNG_PSEUDO_DEFAULT) );
 	gpuErrchk( curandSetPseudoRandomGeneratorSeed(cuRandGenWrap.gen, 1234ULL) );
