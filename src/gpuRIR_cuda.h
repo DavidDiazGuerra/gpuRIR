@@ -60,6 +60,6 @@ class gpuRIR_cuda {
 		static cuRandGeneratorWrapper_t cuRandGenWrap; // I'm not able to compile if I include the cuda headers here... so I have to hide the cuRAND generator
 		
 		// Auxiliar host functions
-		static scalar_t* cuda_rirGenerator(scalar_t*, scalar_t*, scalar_t*, scalar_t*, int, int, int, scalar_t);
+		static scalar_t* cuda_rirGenerator(scalar_t*, scalar_t*, scalar_t*, int, int, int, scalar_t);
 		static int PadData(scalar_t*, scalar_t**, int, scalar_t*, scalar_t**, int, int, int);
 };
