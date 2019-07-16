@@ -180,10 +180,18 @@ __device__ __forceinline__ half2 my_h2cos(half2 x) {
 	return __floats2half2_rn(cosf(__low2float(x)), cosf(__high2float(x)));
 }
 
-__device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 PI_Tw_2) {	
-	return __hmul2(__hadd2(h2ones, h2cos(__hmul2(PI_Tw_2, t))), __float2half2_rn(0.5f));
+__device__ __forceinline__ half2 my_h2cospi(half2 x) {
+	// It is always on [-0.5, 0.5], so we do not need argument reduction
+	
+	// cos(pi*x) polinomial approximation for x in [-0.5,0.5]
+	half2 x2 = __hmul2(x, x);
+	half2 c = __float2half2_rn(-1.229339658587166);
+	c = __hfma2(x2, c, __float2half2_rn(+4.043619929856572f));
+	c = __hfma2(x2, c, __float2half2_rn(-4.934120365987677f));
+	c = __hfma2(x2, c, __float2half2_rn(+0.999995282317910));
+	
+	return c;
 }
-
 __device__ __forceinline__ half2 my_h2sinpi(half2 x) {
 	// Argument reduction to [-0.5, 0.5]
 	half2 i = h2rint(x);
@@ -205,16 +213,23 @@ __device__ __forceinline__ half2 my_h2sinpi(half2 x) {
 	return s;
 }
 
+__device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 Tw_inv) {	
+	half2 c = my_h2cospi(__hmul2(Tw_inv, t));
+	return __hmul2(c, c);
+	// return __hmul2(__hadd2(h2ones, h2cos(__hmul2(PI_Tw_2, t))), __float2half2_rn(0.5f));
+}
+
 __device__ __forceinline__ half2 my_h2sinc(half2 x) {
 	// x = __hmul2(h2pi, x);
 	x = __hfma2(__heq2(x, h2zeros), __float2half2_rn(1e-7f), x);
 	return __h2div(my_h2sinpi(x), __hmul2(h2pi, x));
+	
 }
 
-__device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, half2 Tw_2, half2 PI_Tw_2) {
+__device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, half2 Tw_2, half2 Tw_inv) {
 	half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);  // __hsub2(t, tau);
 	if (__hble2(h2abs(t_tau), Tw_2)) {
-		return __hmul2(hanning_window_mp(t_tau, PI_Tw_2), __hmul2(amp, my_h2sinc( t_tau )));
+		return __hmul2(hanning_window_mp(t_tau, Tw_inv), __hmul2(amp, my_h2sinc( t_tau )));
 	} else return h2zeros;
 	
 	// half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);  // __hsub2(t, tau);
@@ -455,7 +470,7 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 /* Mixed precision KERNELS */
 /***************************/
 
-__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, half2 Tw_2, half2 PI_Tw_2) {
+__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, half2 Tw_2, half2 Tw_inv) {
 	#if __CUDA_ARCH__ >= 530
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
 		int m = blockIdx.y * blockDim.y + threadIdx.y;
@@ -468,7 +483,7 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t
 			scalar_t loc_tim_2 = 2*t+1;
 			for (int n=n_ini; n<n_max; n++) {
 				half2 amp_mp = __float2half2_rn(amp[m*N+n]);
-				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau[m*N+n], loc_tim_1, loc_tim_2, Tw_2, PI_Tw_2));
+				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau[m*N+n], loc_tim_1, loc_tim_2, Tw_2, Tw_inv));
 			}
 			initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 		}
@@ -576,8 +591,8 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, in
 		gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
 		
 		half2 Tw_2 = __float2half2_rn(8e-3f * Fs / 2);
-		half2 PI_Tw_2 = __float2half2_rn(PI / (8e-3f*Fs/2));
-		generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Tw_2, PI_Tw_2 );
+		half2 Tw_inv = __float2half2_rn(1.0f / (8e-3f * Fs));
+		generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Tw_2, Tw_inv );
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
 
