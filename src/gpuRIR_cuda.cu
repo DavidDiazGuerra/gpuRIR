@@ -12,6 +12,9 @@
 #include <vector>
 #include "gpuRIR_cuda.h"
 
+#ifndef __h2div
+#define __h2div h2div
+#endif
 
 // Image Source Method
 static const int nThreadsISM_x = 4;
@@ -470,8 +473,11 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 /* Mixed precision KERNELS */
 /***************************/
 
-__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, half2 Tw_2, half2 Tw_inv) {
+__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs) {
 	#if __CUDA_ARCH__ >= 530
+		half2 Tw_2 = __float2half2_rn(8e-3f * Fs / 2);
+		half2 Tw_inv = __float2half2_rn(1.0f / (8e-3f * Fs));
+
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
 		int m = blockIdx.y * blockDim.y + threadIdx.y;
 		int n_ini = blockIdx.z * ini_red;
@@ -589,10 +595,8 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, in
 
 		half2* initialRIR;
 		gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
-		
-		half2 Tw_2 = __float2half2_rn(8e-3f * Fs / 2);
-		half2 Tw_inv = __float2half2_rn(1.0f / (8e-3f * Fs));
-		generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Tw_2, Tw_inv );
+
+		generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Fs );
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
 
