@@ -12,7 +12,7 @@
 #include <vector>
 #include "gpuRIR_cuda.h"
 
-#ifndef __h2div
+#if CUDART_VERSION < 9000
 #define __h2div h2div
 #endif
 
