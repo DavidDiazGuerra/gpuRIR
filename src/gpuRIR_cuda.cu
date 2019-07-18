@@ -21,9 +21,6 @@ static const int nThreadsISM_x = 4;
 static const int nThreadsISM_y = 4;
 static const int nThreadsISM_z = 4;
 
-// Time vector generation
-static const int nThreadsTime = 128;
-
 // RIR computation
 static const int initialReductionMin = 512;
 static const int nThreadsGen_t = 32;
@@ -46,6 +43,11 @@ static const int nThreadsConv_x = 256;
 static const int nThreadsConv_y = 1;
 static const int nThreadsConv_z = 1;
 
+#if __CUDA_ARCH__ >= 530
+#define h2zeros __float2half2_rn(0.0)
+#define h2ones __float2half2_rn(1.0)
+#define h2pi __float2half2_rn(PI)
+#endif
 
 // To hide the cuRAND generator in the header and don't need to include the cuda headers there
 struct cuRandGeneratorWrapper_t
@@ -56,13 +58,6 @@ cuRandGeneratorWrapper_t gpuRIR_cuda::cuRandGenWrap;
 
 // CUDA architecture in format xy0
 int cuda_arch;
-
-
-#if __CUDA_ARCH__ >= 530
-#define h2zeros __float2half2_rn(0.0)
-#define h2ones __float2half2_rn(1.0)
-#define h2pi __float2half2_rn(PI)
-#endif
 
 
 /***************************/
@@ -82,16 +77,16 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 inline void gpuAssert(curandStatus_t code, const char *file, int line, bool abort=true) {
    if (code != CURAND_STATUS_SUCCESS) 
    {
-      fprintf(stderr,"GPUassert: %s %s %d\n", code, file, line);
+      fprintf(stderr,"cuRAND: %d %s %d\n", code, file, line);
       if (abort) exit(code);
    }
 }
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cufftResult_t code, const char *file, int line, bool abort=true) {
-   if (code != CURAND_STATUS_SUCCESS) 
+   if (code != CUFFT_SUCCESS) 
    {
-      fprintf(stderr,"GPUassert: %s %s %d\n", code, file, line);
+      fprintf(stderr,"cuFFT error: %d %s %d\n", code, file, line);
       if (abort) exit(code);
    }
 }
@@ -146,6 +141,7 @@ __device__ __forceinline__ scalar_t mic_directivity(scalar_t doaVec[3], scalar_t
 		case DIR_HYPCARD:	return 0.25f + 0.75f*cosTheta;
 		case DIR_SUBCARD: 	return 0.75f + 0.25f*cosTheta;
 		case DIR_BIDIR: 	return cosTheta;
+		default: printf("Invalid microphone pattern"); return 0.0f;
 	}
 }
 
@@ -175,26 +171,6 @@ __device__ __forceinline__ half2 h2abs(half2 x) {
 	return *reinterpret_cast<half2*>( &i );
 }
 
-__device__ __forceinline__ half2 my_h2sin(half2 x) {
-	return __floats2half2_rn(sinf(__low2float(x)), sinf(__high2float(x)));
-}
-
-__device__ __forceinline__ half2 my_h2cos(half2 x) {
-	return __floats2half2_rn(cosf(__low2float(x)), cosf(__high2float(x)));
-}
-
-__device__ __forceinline__ half2 my_h2cospi(half2 x) {
-	// It is always on [-0.5, 0.5], so we do not need argument reduction
-	
-	// cos(pi*x) polinomial approximation for x in [-0.5,0.5]
-	half2 x2 = __hmul2(x, x);
-	half2 c = __float2half2_rn(-1.229339658587166);
-	c = __hfma2(x2, c, __float2half2_rn(+4.043619929856572f));
-	c = __hfma2(x2, c, __float2half2_rn(-4.934120365987677f));
-	c = __hfma2(x2, c, __float2half2_rn(+0.999995282317910));
-	
-	return c;
-}
 __device__ __forceinline__ half2 my_h2sinpi(half2 x) {
 	// Argument reduction to [-0.5, 0.5]
 	half2 i = h2rint(x);
@@ -216,32 +192,35 @@ __device__ __forceinline__ half2 my_h2sinpi(half2 x) {
 	return s;
 }
 
+__device__ __forceinline__ half2 my_h2cospi(half2 x) {
+	// It is always on [-0.5, 0.5], so we do not need argument reduction
+	
+	// cos(pi*x) polinomial approximation for x in [-0.5,0.5]
+	half2 x2 = __hmul2(x, x);
+	half2 c = __float2half2_rn(-1.229339658587166f);
+	c = __hfma2(x2, c, __float2half2_rn(+4.043619929856572f));
+	c = __hfma2(x2, c, __float2half2_rn(-4.934120365987677f));
+	c = __hfma2(x2, c, __float2half2_rn(+0.999995282317910f));
+	
+	return c;
+}
+
 __device__ __forceinline__ half2 hanning_window_mp(half2 t, half2 Tw_inv) {	
 	half2 c = my_h2cospi(__hmul2(Tw_inv, t));
 	return __hmul2(c, c);
-	// return __hmul2(__hadd2(h2ones, h2cos(__hmul2(PI_Tw_2, t))), __float2half2_rn(0.5f));
 }
 
 __device__ __forceinline__ half2 my_h2sinc(half2 x) {
-	// x = __hmul2(h2pi, x);
 	x = __hfma2(__heq2(x, h2zeros), __float2half2_rn(1e-7f), x);
 	return __h2div(my_h2sinpi(x), __hmul2(h2pi, x));
 	
 }
 
 __device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, half2 Tw_2, half2 Tw_inv) {
-	half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);  // __hsub2(t, tau);
+	half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);
 	if (__hble2(h2abs(t_tau), Tw_2)) {
 		return __hmul2(hanning_window_mp(t_tau, Tw_inv), __hmul2(amp, my_h2sinc( t_tau )));
 	} else return h2zeros;
-	
-	// half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);  // __hsub2(t, tau);
-	// if (__hble2(h2abs(t_tau), __float2half2_rn(8e-3f/2))) {
-		// half2 FsPI = __hmul2( __float2half2_rn(Fs), __float2half2_rn(PI));
-		// return my_h2sinc( __hmul2(t_tau, FsPI) );
-	// } else return h2zeros;
-	
-	// return my_h2sin(amp);
 }
 
 #endif
@@ -357,11 +336,6 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	}
 }
 
-__global__ void generateTime_kernel(scalar_t* t, scalar_t Fs, int nSamples) {
-	int sample = blockIdx.x * blockDim.x + threadIdx.x;
-	if (sample<nSamples) t[sample] = sample/Fs;
-}
-
 __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Tw) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
@@ -371,7 +345,7 @@ __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t
 	if (m<M && t<T) {
 		scalar_t loc_sum = 0;
 		for (int n=n_ini; n<n_max; n++) {
-			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], /* loc_tim */ t, Tw);
+			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], t, Tw);
 		}
 		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 	}
@@ -928,12 +902,14 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 }
 
 gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
-	activate_mixed_precision(mPrecision);
-
+	// Get CUDA architecture
 	cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
 	cuda_arch = prop.major*100 + prop.minor*10;
 
+	// Activate mixed precision if selected
+	activate_mixed_precision(mPrecision);
+	
 	// Initiate CUDA runtime API
 	scalar_t* memPtr_warmup;
 	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(scalar_t)) );

@@ -9,6 +9,7 @@
 - [Documentation](#documentation)
   * [`simulateRIR`](#simulaterir)
   * [`simulateTrajectory`](#simulatetrajectory)
+  * [`activateMixedPrecision`](#activateMixedPrecision)
   * [`beta_SabineEstimation`](#beta_sabineestimation)
   * [`att2t_SabineEstimator`](#att2t_sabineestimator)
   * [`t2n`](#t2n)
@@ -101,6 +102,15 @@ Filter an audio signal by the RIRs of a motion trajectory recorded with a microp
 *2D ndarray*
 	Matrix with the signals captured by each microphone in each column.
 
+### `activateMixedPrecision`
+
+Activate the mixed precision mode, only for Pascal GPU architecture or superior.
+
+#### Parameters
+
+* **activate** : *bool, optional.*
+        True for activate and Flase for deactivate. True by default.
+        
 ### `beta_SabineEstimation`
 
 Estimation of the reflection coefficients needed to have the desired reverberation time.
