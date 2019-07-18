@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 
 import gpuRIR
-gpuRIR.activate_mixed_precision(False)
+gpuRIR.activateMixedPrecision(False)
 
 room_sz = [3,3,2.5]  # Size of the room [m]
 nb_src = 2  # Number of sources
@@ -32,3 +32,4 @@ RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdi
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
 plt.plot(t, RIRs.reshape(nb_src*nb_rcv, -1).transpose())
+plt.show()

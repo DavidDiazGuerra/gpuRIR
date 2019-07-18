@@ -201,7 +201,7 @@ def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 		
 	return filtered_signal
 
-def activate_mixed_precision(activate=True):
+def activateMixedPrecision(activate=True):
 	''' Activate the mixed precision mode, only for Pascal GPU architecture or superior.
 
 	Parameters
