@@ -216,9 +216,11 @@ __device__ __forceinline__ half2 my_h2sinc(half2 x) {
 	
 }
 
-__device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, half2 Tw_2, half2 Tw_inv) {
-	half2 t_tau = __floats2half2_rn(t1-tau, t2-tau);
-	if (__hble2(h2abs(t_tau), Tw_2)) {
+__device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, scalar_t Tw_2, half2 Tw_inv) {
+	scalar_t t1_tau = t1-tau;
+	scalar_t t2_tau = t2-tau;
+	half2 t_tau = __floats2half2_rn(t1_tau, t2_tau);
+	if (abs(t1_tau)<Tw_2 || abs(t2_tau)<Tw_2) { // __hble2() is terribly slow
 		return __hmul2(hanning_window_mp(t_tau, Tw_inv), __hmul2(amp, my_h2sinc( t_tau )));
 	} else return h2zeros;
 }
@@ -449,10 +451,9 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 
 #if CUDART_VERSION < 9020
 __global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs, scalar_t Tw_2, scalar_t Tw_inv) {
-	half2 h2Tw_2 = __float2half2_rn(Tw_2);
 	half2 h2Tw_inv = __float2half2_rn(Tw_inv);
 #else 
-__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs, half2 h2Tw_2, half2 h2Tw_inv) {
+__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs, scalar_t Tw_2, half2 h2Tw_inv) {
 #endif
 	#if __CUDA_ARCH__ >= 530
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -466,7 +467,7 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t
 			scalar_t loc_tim_2 = 2*t+1;
 			for (int n=n_ini; n<n_max; n++) {
 				half2 amp_mp = __float2half2_rn(amp[m*N+n]);
-				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau[m*N+n], loc_tim_1, loc_tim_2, h2Tw_2, h2Tw_inv));
+				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau[m*N+n], loc_tim_1, loc_tim_2, Tw_2, h2Tw_inv));
 			}
 			initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 		}
@@ -573,13 +574,12 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, in
 		half2* initialRIR;
 		gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
 
+		scalar_t Tw_2 = 8e-3f * Fs / 2;
 		#if CUDART_VERSION < 9020
 			// For CUDA versions older than 9.2 it is nos possible to call from host code __float2half2_rn,
 			// but doing it in the kernel is slower
-			scalar_t Tw_2 = 8e-3f * Fs / 2;
 			scalar_t Tw_inv = 1.0f / (8e-3f * Fs);
 		#else 
-			half2 Tw_2 = __float2half2_rn(8e-3f * Fs / 2);
 			half2 Tw_inv = __float2half2_rn(1.0f / (8e-3f * Fs));
 		#endif
 		generateRIR_mp_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T/2, M, N, iniRIR_N, initialReduction, Fs, Tw_2, Tw_inv );
