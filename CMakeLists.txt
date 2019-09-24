@@ -1,21 +1,22 @@
 # https://stackoverflow.com/questions/51907755/building-a-pybind11-module-with-cpp-and-cuda-sources-using-cmake
 
 cmake_minimum_required(VERSION 3.12)
-#set(CMAKE_CXX_COMPILER "/usr/local/gcc55/bin/g++55")
+
 project(gpuRIR LANGUAGES CXX CUDA)
 find_package(CUDA)
 
-set(PYBIND11_CPP_STANDARD -std=c++11)
-add_subdirectory(third_party/pybind11)
+# Select several CUDA architectures
+include(FindCUDA)
+cuda_select_nvcc_arch_flags(CUDA_ARCH_FLAGS Common) # Change Common by Auto for autodetect
+string(REPLACE ";" " " CUDA_ARCH_FLAGS "${CUDA_ARCH_FLAGS}")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_ARCH_FLAGS}")
+
+set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -D_FORCE_INLINES")
+# set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -lineinfo")
 
 add_library(gpuRIRcu STATIC
     src/gpuRIR_cuda.cu
 )
-
-SET(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -D_FORCE_INLINES")
-# SET(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -lineinfo")
-
-#target_link_libraries(gpuRIRcu PRIVATE -lcurand)
 
 set_target_properties(gpuRIRcu PROPERTIES 
     POSITION_INDEPENDENT_CODE ON
@@ -26,6 +27,9 @@ set_target_properties(gpuRIRcu PROPERTIES
 add_library(gpuRIR_bind MODULE
     src/python_bind.cpp
 )
+
+set(PYBIND11_CPP_STANDARD -std=c++11)
+add_subdirectory(third_party/pybind11)
 
 set_target_properties(gpuRIR_bind PROPERTIES 
     CXX_VISIBILITY_PRESET "hidden"

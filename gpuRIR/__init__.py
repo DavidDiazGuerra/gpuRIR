@@ -6,9 +6,9 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from gpuRIR_bind import simulateRIR_bind, gpu_conv, cuda_warmup
+from gpuRIR_bind import gpuRIR_bind
 
-__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory"]
+__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision"]
 
 mic_patterns =	{
   "omni": 0,
@@ -153,7 +153,7 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 	if orV_rcv is None: orV_rcv = np.zeros_like(pos_rcv)
 	else: orV_rcv = orV_rcv.astype('float32', order='C', copy=False)
 		
-	return simulateRIR_bind(room_sz, beta, pos_src, pos_rcv, orV_rcv, mic_patterns[mic_pattern], nb_img, Tdiff, Tmax, fs, c)
+	return gpuRIR_bind_simulator.simulateRIR_bind(room_sz, beta, pos_src, pos_rcv, orV_rcv, mic_patterns[mic_pattern], nb_img, Tdiff, Tmax, fs, c)
 
 def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 	''' Filter an audio signal by the RIRs of a motion trajectory recorded with a microphone array.
@@ -192,7 +192,7 @@ def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 	for n in range(nPts):
 		segments[n,0:w_len[n]] = source_signal[w_ini[n]:w_ini[n+1]]
 	segments = segments.astype('float32', order='C', copy=False)
-	convolution = gpu_conv(segments, RIRs)
+	convolution = gpuRIR_bind_simulator.gpu_conv(segments, RIRs)
 	
 	filtered_signal = np.zeros((nSamples+lenRIR-1, nRcv))
 	for m in range(nRcv):
@@ -201,5 +201,16 @@ def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 		
 	return filtered_signal
 
-# Initialize the CUDA runtime API and the cuFFT library when the module is loaded
-cuda_warmup()
+def activateMixedPrecision(activate=True):
+	''' Activate the mixed precision mode, only for Pascal GPU architecture or superior.
+
+	Parameters
+	----------
+	activate : bool, optional
+		True for activate and Flase for deactivate. True by default.
+
+	'''
+	gpuRIR_bind_simulator.activate_mixed_precision_bind(activate)
+
+# Create the simulator object when the module is loaded
+gpuRIR_bind_simulator = gpuRIR_bind()

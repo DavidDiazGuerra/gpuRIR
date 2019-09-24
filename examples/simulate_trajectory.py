@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 
 import gpuRIR
+gpuRIR.activateMixedPrecision(False)
 
 fs, source_signal = wavfile.read('source_signal.wav')
 
@@ -33,3 +34,4 @@ RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_traj, pos_rcv, nb_img, Tmax, fs, Td
 filtered_signal = gpuRIR.simulateTrajectory(source_signal, RIRs)
 wavfile.write('filtered_signal.wav', fs, filtered_signal)
 plt.plot(filtered_signal)
+plt.show()

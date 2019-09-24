@@ -6,9 +6,10 @@ It may need several minutes.
 
 import numpy as np
 import matplotlib.pyplot as plt
-import  time
+import time
 
 import gpuRIR
+gpuRIR.activateMixedPrecision(False)
 
 nb_src_vec = np.concatenate([2**np.arange(12), [4094]]) # Number of RIRs to measure
 nb_test_per_point = 10 # Number of simulations per T60 to average the runtime
@@ -46,3 +47,4 @@ print(times.transpose())
 plt.loglog(nb_src_vec, times)
 plt.ylabel("time [s]")
 plt.xlabel("number of RIRs")
+plt.show()

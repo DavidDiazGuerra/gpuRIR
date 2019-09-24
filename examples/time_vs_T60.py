@@ -6,9 +6,10 @@ It may need several minutes.
 
 import numpy as np
 import matplotlib.pyplot as plt
-import  time
+import time
 
 import gpuRIR
+gpuRIR.activateMixedPrecision(False)
 
 T60_vec = np.arange(0.1, 2.2, 0.2) # Reverberation times to measure
 nb_test_per_point = 10 # Number of simulations per T60 to average the runtime
@@ -46,3 +47,4 @@ print(times.transpose())
 plt.semilogy(T60_vec, times)
 plt.ylabel("time [s]")
 plt.xlabel("T60 [s]")
+plt.show()
