@@ -23,6 +23,7 @@ static const int nThreadsISM_z = 4;
 
 // RIR computation
 static const int initialReductionMin = 512;
+static const int lut_oversamp = 16; 
 static const int nThreadsGen_t = 32;
 static const int nThreadsGen_m = 4;
 static const int nThreadsGen_n = 1; // Don't change it
@@ -114,9 +115,9 @@ __device__ __forceinline__ scalar_t sinc(scalar_t x) {
 	return (x==0)? 1 : sinf(x)/x;
 }
 
-__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, scalar_t Tw) {
+__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
 	scalar_t t_tau = t - tau;
-	return (abs(t_tau)<Tw/2)? hanning_window(t_tau, Tw) * amp * sinc( (t_tau) * PI ) : 0.0f;
+	return (abs(t_tau)<Tw_2)? amp * tex1D<scalar_t>(sinc_lut, __fmaf_rz(t_tau,lut_oversamp,lut_center)) : 0.0f;
 }
 
 __device__ __forceinline__ scalar_t SabineT60( scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
@@ -338,7 +339,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	}
 }
 
-__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Tw) {
+__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	int n_ini = blockIdx.z * ini_red;
@@ -347,7 +348,7 @@ __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t
 	if (m<M && t<T) {
 		scalar_t loc_sum = 0;
 		for (int n=n_ini; n<n_max; n++) {
-			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], t, Tw);
+			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], t, Tw_2, sinc_lut, lut_center);
 		}
 		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 	}
@@ -520,6 +521,46 @@ __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M
 /* Auxiliar host functions */
 /***************************/
 
+cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int lut_len) {
+	// Create lut in host memory
+	int lut_center = lut_len / 2;
+	scalar_t* sinc_lut_host = (scalar_t*)malloc(sizeof(scalar_t) * lut_len);
+	for (int i=0; i<lut_center; i++) {
+		scalar_t x = (float)i / lut_oversamp;
+		scalar_t sinc = (x==0.0f)? 1.0f : sin(PI*x) / (PI*x);
+		scalar_t hann = 0.5f * (1.0f + cos(2.0f*PI*x/Tw));
+		scalar_t y = hann * sinc;
+		sinc_lut_host[lut_center+i] = y;
+		sinc_lut_host[lut_center-i] = y;
+	}
+	
+	// Copy the lut to a device cudaArray
+	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+    cudaMallocArray(cuArrayLut, &channelDesc, lut_len);
+    cudaMemcpyToArray(*cuArrayLut, 0, 0, sinc_lut_host, sizeof(scalar_t)*lut_len,
+                      cudaMemcpyHostToDevice);
+	
+	// Specify texture
+    struct cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = *cuArrayLut;
+
+	// Specify texture object parameters
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0]   = cudaAddressModeBorder;
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.readMode         = cudaReadModeElementType;
+    texDesc.normalizedCoords = 0;
+	
+	// Create texture object
+    cudaTextureObject_t texObjLut = 0;
+    cudaCreateTextureObject(&texObjLut, &resDesc, &texDesc, NULL);
+	
+	return texObjLut;
+}
+
 void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
 	int initialReduction = initialReductionMin;
 	while (M * T * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
@@ -531,10 +572,17 @@ void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau,
 	scalar_t* initialRIR;
 	gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(scalar_t)) );
 	
-	scalar_t Tw = 8e-3f * Fs; // Window duration [samples]
-	generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
+	int Tw = (int) round(8e-3f * Fs); // Window duration [samples]
+	int lut_len = Tw * lut_oversamp;
+	lut_len += ((lut_len%2)? 0 : 1); // Must be odd
+	cudaArray* cuArrayLut;
+	cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
+	
+	generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
 	gpuErrchk( cudaDeviceSynchronize() );
 	gpuErrchk( cudaPeekAtLastError() );
+	cudaDestroyTextureObject(sinc_lut);
+	cudaFreeArray(cuArrayLut);
 	
 	dim3 threadsPerBlockRed(nThreadsRed, 1, 1);
 	scalar_t* intermediateRIR;
