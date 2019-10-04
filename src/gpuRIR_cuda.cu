@@ -553,7 +553,7 @@ cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int 
 	// Create lut in host memory
 	int lut_center = lut_len / 2;
 	scalar_t* sinc_lut_host = (scalar_t*)malloc(sizeof(scalar_t) * lut_len);
-	for (int i=0; i<lut_center; i++) {
+	for (int i=0; i<=lut_center; i++) {
 		scalar_t x = (float)i / lut_oversamp;
 		scalar_t sinc = (x==0.0f)? 1.0f : sin(PI*x) / (PI*x);
 		scalar_t hann = 0.5f * (1.0f + cos(2.0f*PI*x/Tw));
