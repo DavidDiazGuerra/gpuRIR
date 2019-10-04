@@ -10,6 +10,7 @@ import time
 
 import gpuRIR
 gpuRIR.activateMixedPrecision(False)
+gpuRIR.activateLUT(False)
 
 T60_vec = np.arange(0.1, 2.2, 0.2) # Reverberation times to measure
 nb_test_per_point = 10 # Number of simulations per T60 to average the runtime

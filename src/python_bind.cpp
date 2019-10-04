@@ -12,13 +12,15 @@ namespace py = pybind11;
 
 class gpuRIR_bind {
 	public:
-		gpuRIR_bind(bool mPrecision=false) : mixed_precision(mPrecision), gpuRIR_cuda_simulator(mPrecision) {};
+		gpuRIR_bind(bool mPrecision=false, bool lut=true) : mixed_precision(mPrecision), lookup_table(lut), gpuRIR_cuda_simulator(mPrecision, lut) {};
 		
 		py::array simulateRIR_bind(std::vector<scalar_t>, std::vector<scalar_t>, py::array_t<scalar_t, py::array::c_style>, py::array_t<scalar_t, py::array::c_style>, py::array_t<scalar_t, py::array::c_style>, micPattern, std::vector<int> ,scalar_t, scalar_t, scalar_t, scalar_t);
 		py::array gpu_conv(py::array_t<scalar_t, py::array::c_style>, py::array_t<scalar_t, py::array::c_style>);
 		bool activate_mixed_precision_bind(bool);
+		bool activate_lut_bind(bool);
 		
 		bool mixed_precision;
+		bool lookup_table;
 	
 	private:
 		gpuRIR_cuda gpuRIR_cuda_simulator;
@@ -108,6 +110,10 @@ bool gpuRIR_bind::activate_mixed_precision_bind(bool activate) {
   gpuRIR_cuda_simulator.activate_mixed_precision(activate);
 }
 
+bool gpuRIR_bind::activate_lut_bind(bool activate) {
+  gpuRIR_cuda_simulator.activate_lut(activate);
+}
+
 
 PYBIND11_MODULE(gpuRIR_bind,m)
 {
@@ -120,6 +126,6 @@ PYBIND11_MODULE(gpuRIR_bind,m)
 			 py::arg("Fs"), py::arg("c")=343.0f )
 		.def("gpu_conv", &gpuRIR_bind::gpu_conv, "Batched convolution using FFTs in GPU", py::arg("source_segments"), py::arg("RIR"))
 		.def("activate_mixed_precision_bind", &gpuRIR_bind::activate_mixed_precision_bind, "Activate the mixed precision mode, only for Pascal GPU architecture or superior",
-			 py::arg("activate"));
-
+			 py::arg("activate"))
+		.def("activate_lut_bind", &gpuRIR_bind::activate_lut_bind, "Activate the lookup table", py::arg("activate"));
 }

@@ -8,7 +8,7 @@ from scipy.signal import convolve
 
 from gpuRIR_bind import gpuRIR_bind
 
-__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision"]
+__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision", "activate_lut"]
 
 mic_patterns =	{
   "omni": 0,
@@ -211,6 +211,17 @@ def activateMixedPrecision(activate=True):
 
 	'''
 	gpuRIR_bind_simulator.activate_mixed_precision_bind(activate)
+
+def activateLUT(activate=True):
+	''' Activate the lookup table for the sinc computations.
+
+	Parameters
+	----------
+	activate : bool, optional
+		True for activate and Flase for deactivate. True by default.
+
+	'''
+	gpuRIR_bind_simulator.activate_lut_bind(activate)
 
 # Create the simulator object when the module is loaded
 gpuRIR_bind_simulator = gpuRIR_bind()

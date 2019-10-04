@@ -115,9 +115,9 @@ __device__ __forceinline__ scalar_t sinc(scalar_t x) {
 	return (x==0)? 1 : sinf(x)/x;
 }
 
-__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, scalar_t Tw) {
 	scalar_t t_tau = t - tau;
-	return (abs(t_tau)<Tw_2)? amp * tex1D<scalar_t>(sinc_lut, __fmaf_rz(t_tau,lut_oversamp,lut_center)) : 0.0f;
+	return (abs(t_tau)<Tw/2)? hanning_window(t_tau, Tw) * amp * sinc( (t_tau) * PI ) : 0.0f;
 }
 
 __device__ __forceinline__ scalar_t SabineT60( scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
@@ -227,6 +227,15 @@ __device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar
 }
 
 #endif
+
+/******************************************/
+/* Lookup table auxiliar device functions */
+/******************************************/
+
+__device__ __forceinline__ scalar_t image_sample_lut(scalar_t amp, scalar_t tau, scalar_t t, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+	scalar_t t_tau = t - tau;
+	return (abs(t_tau)<Tw_2)? amp * tex1D<scalar_t>(sinc_lut, __fmaf_rz(t_tau,lut_oversamp,lut_center)) : 0.0f;
+}
 
 /***********/
 /* KERNELS */
@@ -339,7 +348,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	}
 }
 
-__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Tw) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	int n_ini = blockIdx.z * ini_red;
@@ -348,7 +357,7 @@ __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t
 	if (m<M && t<T) {
 		scalar_t loc_sum = 0;
 		for (int n=n_ini; n<n_max; n++) {
-			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], t, Tw_2, sinc_lut, lut_center);
+			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], t, Tw);
 		}
 		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
 	}
@@ -517,6 +526,25 @@ __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M
 	#endif
 }
 
+/************************/
+/* Lookup table KERNELS */
+/************************/
+
+__global__ void generateRIR_kernel_lut(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+	int t = blockIdx.x * blockDim.x + threadIdx.x;
+	int m = blockIdx.y * blockDim.y + threadIdx.y;
+	int n_ini = blockIdx.z * ini_red;
+	int n_max = fminf(n_ini + ini_red, N);
+	
+	if (m<M && t<T) {
+		scalar_t loc_sum = 0;
+		for (int n=n_ini; n<n_max; n++) {
+			loc_sum += image_sample_lut(amp[m*N+n], tau[m*N+n], t, Tw_2, sinc_lut, lut_center);
+		}
+		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
+	}
+}
+
 /***************************/
 /* Auxiliar host functions */
 /***************************/
@@ -573,16 +601,25 @@ void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau,
 	gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(scalar_t)) );
 	
 	int Tw = (int) round(8e-3f * Fs); // Window duration [samples]
-	int lut_len = Tw * lut_oversamp;
-	lut_len += ((lut_len%2)? 0 : 1); // Must be odd
-	cudaArray* cuArrayLut;
-	cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
 	
-	generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
-	gpuErrchk( cudaDeviceSynchronize() );
-	gpuErrchk( cudaPeekAtLastError() );
-	cudaDestroyTextureObject(sinc_lut);
-	cudaFreeArray(cuArrayLut);
+	if (lookup_table) {
+		int lut_len = Tw * lut_oversamp;
+		lut_len += ((lut_len%2)? 0 : 1); // Must be odd
+		cudaArray* cuArrayLut;
+		cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
+		
+		generateRIR_kernel_lut<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
+		gpuErrchk( cudaDeviceSynchronize() );
+		gpuErrchk( cudaPeekAtLastError() );
+		
+		cudaDestroyTextureObject(sinc_lut);
+		cudaFreeArray(cuArrayLut);
+	} else {
+		generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
+		gpuErrchk( cudaDeviceSynchronize() );
+		gpuErrchk( cudaPeekAtLastError() );
+	}
+		
 	
 	dim3 threadsPerBlockRed(nThreadsRed, 1, 1);
 	scalar_t* intermediateRIR;
@@ -949,14 +986,15 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 	return convolved_segments;
 }
 
-gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
+gpuRIR_cuda::gpuRIR_cuda(bool mPrecision, bool lut) {
 	// Get CUDA architecture
 	cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
 	cuda_arch = prop.major*100 + prop.minor*10;
 
-	// Activate mixed precision if selected
+	// Activate mixed precision and lut if selected
 	activate_mixed_precision(mPrecision);
+	activate_lut(lut);
 	
 	// Initiate CUDA runtime API
 	scalar_t* memPtr_warmup;
@@ -975,10 +1013,25 @@ gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
 
 bool gpuRIR_cuda::activate_mixed_precision(bool activate) {
 	if (cuda_arch >= 530) {
+		if (activate && lookup_table) {
+			printf("The mixed precision implementation is not compatible with the lookup table.");
+			printf("Dissabling the lookup table.");
+			lookup_table = false;
+		}
 		mixed_precision = activate;
 	} else {
 		if (activate) printf("This feature requires Pascal GPU architecture or higher.\n");
 		mixed_precision = false;
 	}
 	return mixed_precision;
+}
+
+bool gpuRIR_cuda::activate_lut(bool activate) {
+	if (activate && mixed_precision) {
+		printf("The lookup table is not compatible with the mixed precision implementation.");
+		printf("Disabling the mixed precision implementation.");
+		mixed_precision = false;
+	}
+	lookup_table = activate;
+	return lookup_table;
 }
