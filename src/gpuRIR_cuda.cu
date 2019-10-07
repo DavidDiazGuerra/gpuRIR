@@ -142,7 +142,7 @@ __device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3]
 		case DIR_HYPCARD:	return 0.25f + 0.75f*cosTheta;
 		case DIR_SUBCARD: 	return 0.75f + 0.25f*cosTheta;
 		case DIR_BIDIR: 	return cosTheta;
-		default: printf("Invalid microphone pattern"); return 0.0f;
+		default: printf("Invalid microphone pattern.\n"); return 0.0f;
 	}
 }
 
@@ -165,6 +165,7 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
 /*********************************************/
 /* Mixed precision auxiliar device functions */
 /*********************************************/
+
 #if __CUDA_ARCH__ >= 530
 
 __device__ __forceinline__ half2 h2abs(half2 x) {
@@ -1014,8 +1015,8 @@ gpuRIR_cuda::gpuRIR_cuda(bool mPrecision, bool lut) {
 bool gpuRIR_cuda::activate_mixed_precision(bool activate) {
 	if (cuda_arch >= 530) {
 		if (activate && lookup_table) {
-			printf("The mixed precision implementation is not compatible with the lookup table.");
-			printf("Dissabling the lookup table.");
+			printf("The mixed precision implementation is not compatible with the lookup table.\n");
+			printf("Disabling the lookup table.\n");
 			lookup_table = false;
 		}
 		mixed_precision = activate;
@@ -1028,8 +1029,8 @@ bool gpuRIR_cuda::activate_mixed_precision(bool activate) {
 
 bool gpuRIR_cuda::activate_lut(bool activate) {
 	if (activate && mixed_precision) {
-		printf("The lookup table is not compatible with the mixed precision implementation.");
-		printf("Disabling the mixed precision implementation.");
+		printf("The lookup table is not compatible with the mixed precision implementation.\n");
+		printf("Disabling the mixed precision implementation.\n");
 		mixed_precision = false;
 	}
 	lookup_table = activate;
