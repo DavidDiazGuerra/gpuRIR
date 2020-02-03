@@ -10,6 +10,7 @@ from math import ceil
 
 import gpuRIR
 gpuRIR.activateMixedPrecision(False)
+gpuRIR.activateLUT(True)
 
 room_sz = [3,3,2.5]  # Size of the room [m]
 nb_src = 2  # Number of sources

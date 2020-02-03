@@ -23,6 +23,7 @@ static const int nThreadsISM_z = 4;
 
 // RIR computation
 static const int initialReductionMin = 512;
+static const int lut_oversamp = 16; 
 static const int nThreadsGen_t = 32;
 static const int nThreadsGen_m = 4;
 static const int nThreadsGen_n = 1; // Don't change it
@@ -106,32 +107,32 @@ inline unsigned int pow2roundup (unsigned int x) {
 /* Auxiliar device functions */
 /*****************************/
 
-__device__ __forceinline__ scalar_t hanning_window(scalar_t t, scalar_t Tw) {
+__device__ __forceinline__ float hanning_window(float t, float Tw) {
 	return 0.5f * (1.0f + __cosf(2.0f*PI*t/Tw));
 }
 
-__device__ __forceinline__ scalar_t sinc(scalar_t x) {
+__device__ __forceinline__ float sinc(float x) {
 	return (x==0)? 1 : sinf(x)/x;
 }
 
-__device__ __forceinline__ scalar_t image_sample(scalar_t amp, scalar_t tau, scalar_t t, scalar_t Tw) {
-	scalar_t t_tau = t - tau;
+__device__ __forceinline__ float image_sample(float amp, float tau, float t, float Tw) {
+	float t_tau = t - tau;
 	return (abs(t_tau)<Tw/2)? hanning_window(t_tau, Tw) * amp * sinc( (t_tau) * PI ) : 0.0f;
 }
 
-__device__ __forceinline__ scalar_t SabineT60( scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
-							scalar_t beta_x1, scalar_t beta_x2, scalar_t beta_y1, scalar_t beta_y2, scalar_t beta_z1, scalar_t beta_z2 ) {
-	scalar_t Sa = ((1.0f-beta_x1*beta_x1) + (1.0f-beta_x2*beta_x2)) * room_sz_y * room_sz_z +
+__device__ __forceinline__ float SabineT60( float room_sz_x, float room_sz_y, float room_sz_z,
+							float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2 ) {
+	float Sa = ((1.0f-beta_x1*beta_x1) + (1.0f-beta_x2*beta_x2)) * room_sz_y * room_sz_z +
 				  ((1.0f-beta_y1*beta_y1) + (1.0f-beta_y2*beta_y2)) * room_sz_x * room_sz_z +
 				  ((1.0f-beta_z1*beta_z1) + (1.0f-beta_z2*beta_z2)) * room_sz_x * room_sz_y;
-	scalar_t V = room_sz_x * room_sz_y * room_sz_z;
+	float V = room_sz_x * room_sz_y * room_sz_z;
 	return 0.161f * V / Sa;
 }
 
-__device__ __forceinline__ scalar_t mic_directivity(scalar_t doaVec[3], scalar_t orVec[3], micPattern pattern) {
+__device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3], micPattern pattern) {
 	if (pattern == DIR_OMNI) return 1.0f;
 	
-	scalar_t cosTheta = doaVec[0]*orVec[0] + doaVec[1]*orVec[1] + doaVec[2]*orVec[2];
+	float cosTheta = doaVec[0]*orVec[0] + doaVec[1]*orVec[1] + doaVec[2]*orVec[2];
 	cosTheta /= sqrtf(doaVec[0]*doaVec[0] + doaVec[1]*doaVec[1] + doaVec[2]*doaVec[2]);
 	cosTheta /= sqrtf(orVec[0]*orVec[0] + orVec[1]*orVec[1] + orVec[2]*orVec[2]);
 	
@@ -141,7 +142,7 @@ __device__ __forceinline__ scalar_t mic_directivity(scalar_t doaVec[3], scalar_t
 		case DIR_HYPCARD:	return 0.25f + 0.75f*cosTheta;
 		case DIR_SUBCARD: 	return 0.75f + 0.25f*cosTheta;
 		case DIR_BIDIR: 	return cosTheta;
-		default: printf("Invalid microphone pattern"); return 0.0f;
+		default: printf("Invalid microphone pattern.\n"); return 0.0f;
 	}
 }
 
@@ -164,6 +165,7 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
 /*********************************************/
 /* Mixed precision auxiliar device functions */
 /*********************************************/
+
 #if __CUDA_ARCH__ >= 530
 
 __device__ __forceinline__ half2 h2abs(half2 x) {
@@ -216,9 +218,9 @@ __device__ __forceinline__ half2 my_h2sinc(half2 x) {
 	
 }
 
-__device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar_t t1, scalar_t t2, scalar_t Tw_2, half2 Tw_inv) {
-	scalar_t t1_tau = t1-tau;
-	scalar_t t2_tau = t2-tau;
+__device__ __forceinline__ half2 image_sample_mp(half2 amp, float tau, float t1, float t2, float Tw_2, half2 Tw_inv) {
+	float t1_tau = t1-tau;
+	float t2_tau = t2-tau;
 	half2 t_tau = __floats2half2_rn(t1_tau, t2_tau);
 	if (abs(t1_tau)<Tw_2 || abs(t2_tau)<Tw_2) { // __hble2() is terribly slow
 		return __hmul2(hanning_window_mp(t_tau, Tw_inv), __hmul2(amp, my_h2sinc( t_tau )));
@@ -227,20 +229,29 @@ __device__ __forceinline__ half2 image_sample_mp(half2 amp, scalar_t tau, scalar
 
 #endif
 
+/******************************************/
+/* Lookup table auxiliar device functions */
+/******************************************/
+
+__device__ __forceinline__ float image_sample_lut(float amp, float tau, float t, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+	float t_tau = t - tau;
+	return (abs(t_tau)<Tw_2)? amp * tex1D<float>(sinc_lut, __fmaf_rz(t_tau,lut_oversamp,lut_center)) : 0.0f;
+}
+
 /***********/
 /* KERNELS */
 /***********/
 
-__global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
-								  scalar_t* g_tau /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
-								  scalar_t* g_tau_dp /*[M_src]M_rcv]*/,
-								  scalar_t* g_pos_src/*[M_src][3]*/, scalar_t* g_pos_rcv/*[M_rcv][3]*/, scalar_t* g_orV_rcv/*[M_rcv][3]*/,
-								  micPattern mic_pattern, scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
-								  scalar_t beta_x1, scalar_t beta_x2, scalar_t beta_y1, scalar_t beta_y2, scalar_t beta_z1, scalar_t beta_z2, 
+__global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
+								  float* g_tau /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
+								  float* g_tau_dp /*[M_src]M_rcv]*/,
+								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_rcv/*[M_rcv][3]*/,
+								  micPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
+								  float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2, 
 								  int nb_img_x, int nb_img_y, int nb_img_z,
-								  int M_src, int M_rcv, scalar_t c, scalar_t Fs) {
+								  int M_src, int M_rcv, float c, float Fs) {
 	
-	extern __shared__ scalar_t sdata[];
+	extern __shared__ float sdata[];
 		
 	int n[3];
 	n[0] = blockIdx.x * blockDim.x + threadIdx.x;
@@ -252,12 +263,12 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	N[1] = nb_img_y;
 	N[2] = nb_img_z;
 	
-	scalar_t room_sz[3];
+	float room_sz[3];
 	room_sz[0] = room_sz_x;
 	room_sz[1] = room_sz_y;
 	room_sz[2] = room_sz_z;
 	
-	scalar_t beta[6];
+	float beta[6];
 	beta[0] = - beta_x1;
 	beta[1] = - beta_x2;
 	beta[2] = - beta_y1;
@@ -269,7 +280,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	int n_idx = n[0]*N[1]*N[2] + n[1]*N[2] + n[2];
 	
 	// Copy g_pos_src to shared memory
-	scalar_t* sh_pos_src = (scalar_t*) sdata;
+	float* sh_pos_src = (float*) sdata;
 	if (threadIdx.y==0 && threadIdx.z==0)  {
 		for (int m=threadIdx.x; m<M_src; m+=blockDim.x) {
 			sh_pos_src[m*3  ] = g_pos_src[m*3  ];
@@ -279,7 +290,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	}
 	
 	// Copy g_pos_rcv to shared memory
-	scalar_t* sh_pos_rcv = &sh_pos_src[M_src*3];
+	float* sh_pos_rcv = &sh_pos_src[M_src*3];
 	if (threadIdx.x==0 && threadIdx.z==0)  {
 		for (int m=threadIdx.y; m<M_rcv; m+=blockDim.y) {
 			sh_pos_rcv[m*3  ] = g_pos_rcv[m*3  ];
@@ -289,7 +300,7 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	}
 	
 	// Copy g_orV_rcv to shared memory
-	scalar_t* sh_orV_rcv = &sh_pos_rcv[M_rcv*3];
+	float* sh_orV_rcv = &sh_pos_rcv[M_rcv*3];
 	if (threadIdx.x==0 && threadIdx.y==0)  {
 		for (int m=threadIdx.z; m<M_rcv; m+=blockDim.z) {
 			sh_orV_rcv[m*3  ] = g_orV_rcv[m*3  ];
@@ -304,8 +315,8 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	if (n[0]<N[0] & n[1]<N[1] & n[2]<N[2]) {
 		
 		// Common factors for each src and rcv
-		scalar_t rflx_att = 1;
-		scalar_t clust_pos[3];
+		float rflx_att = 1;
+		float clust_pos[3];
 		int clust_idx[3];
 		int rflx_idx[3];
 		bool direct_path = true;
@@ -320,14 +331,14 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 		// Individual factors for each src and rcv
 		for (int m_src=0; m_src<M_src; m_src++) {
 			for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
-				scalar_t vec[3];
-				scalar_t dist = 0;
+				float vec[3];
+				float dist = 0;
 				for (int d=0; d<3; d++) {
 					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d];
 					dist += vec[d] * vec[d];
 				}
 				dist = sqrtf(dist);
-				scalar_t amp = rflx_att / (4*PI*dist);
+				float amp = rflx_att / (4*PI*dist);
 				amp *= mic_directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern);
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
@@ -338,14 +349,14 @@ __global__ void calcAmpTau_kernel(scalar_t* g_amp /*[M_src]M_rcv][nb_img_x][nb_i
 	}
 }
 
-__global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Tw) {
+__global__ void generateRIR_kernel(float* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, float Tw) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	int n_ini = blockIdx.z * ini_red;
 	int n_max = fminf(n_ini + ini_red, N);
 	
 	if (m<M && t<T) {
-		scalar_t loc_sum = 0;
+		float loc_sum = 0;
 		for (int n=n_ini; n<n_max; n++) {
 			loc_sum += image_sample(amp[m*N+n], tau[m*N+n], t, Tw);
 		}
@@ -353,8 +364,8 @@ __global__ void generateRIR_kernel(scalar_t* initialRIR, scalar_t* amp, scalar_t
 	}
 }
 
-__global__ void reduceRIR_kernel(scalar_t* initialRIR, scalar_t* intermediateRIR, int M, int T, int N, int intRIR_N) {
-	extern __shared__ scalar_t sdata[];
+__global__ void reduceRIR_kernel(float* initialRIR, float* intermediateRIR, int M, int T, int N, int intRIR_N) {
+	extern __shared__ float sdata[];
 	
 	int tid = threadIdx.x;
 	int n = blockIdx.x*(blockDim.x*2) + threadIdx.x;
@@ -376,37 +387,37 @@ __global__ void reduceRIR_kernel(scalar_t* initialRIR, scalar_t* intermediateRIR
 	}
 }
 
-__global__ void envPred_kernel(scalar_t* A /*[M_src]M_rcv]*/, scalar_t* alpha /*[M_src]M_rcv]*/, 
-						scalar_t* RIRs_early /*[M_src][M_rcv][nSamples]*/, scalar_t* tau_dp, /*[M_src]M_rcv]*/
-						int M_src, int M_rcv, int nSamples, scalar_t Fs,
-						scalar_t room_sz_x, scalar_t room_sz_y, scalar_t room_sz_z,
-						scalar_t beta_x1, scalar_t beta_x2, scalar_t beta_y1, scalar_t beta_y2, scalar_t beta_z1, scalar_t beta_z2) {
+__global__ void envPred_kernel(float* A /*[M_src]M_rcv]*/, float* alpha /*[M_src]M_rcv]*/, 
+						float* RIRs_early /*[M_src][M_rcv][nSamples]*/, float* tau_dp, /*[M_src]M_rcv]*/
+						int M_src, int M_rcv, int nSamples, float Fs,
+						float room_sz_x, float room_sz_y, float room_sz_z,
+						float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2) {
 		
-	scalar_t w_sz = 10e-3f * Fs; // Maximum window size (samples) to compute the final power of the early RIRs_early
+	float w_sz = 10e-3f * Fs; // Maximum window size (samples) to compute the final power of the early RIRs_early
 	
 	int m_src = blockIdx.x * blockDim.x + threadIdx.x;
 	int m_rcv = blockIdx.y * blockDim.y + threadIdx.y;
 	
 	if (m_src<M_src && m_rcv<M_rcv) {
 		int w_start = __float2int_ru( max(nSamples-w_sz, tau_dp[m_src*M_rcv+m_rcv]));
-		scalar_t w_center = (w_start + (nSamples-w_start)/2.0);
+		float w_center = (w_start + (nSamples-w_start)/2.0);
 		
-		scalar_t finalPower = 0.0f;
+		float finalPower = 0.0f;
 		for (int t=w_start; t<nSamples; t++) {
-			scalar_t aux = RIRs_early[m_src*M_rcv*nSamples + m_rcv*nSamples + t];
+			float aux = RIRs_early[m_src*M_rcv*nSamples + m_rcv*nSamples + t];
 			finalPower += aux*aux;
 		}
 		finalPower /= nSamples-w_start;
 		
-		scalar_t T60 = SabineT60(room_sz_x, room_sz_y, room_sz_z, beta_x1, beta_x2, beta_y1, beta_y2, beta_z1, beta_z2);
-		scalar_t loc_alpha = -13.8155f / (T60 * Fs); //-13.8155 == log(10^(-6))
+		float T60 = SabineT60(room_sz_x, room_sz_y, room_sz_z, beta_x1, beta_x2, beta_y1, beta_y2, beta_z1, beta_z2);
+		float loc_alpha = -13.8155f / (T60 * Fs); //-13.8155 == log(10^(-6))
 		
 		A[m_src*M_rcv + m_rcv] = finalPower / expf(loc_alpha*(w_center-tau_dp[m_src*M_rcv+m_rcv]));
 		alpha[m_src*M_rcv + m_rcv] = loc_alpha;
 	}
 }
 
-__global__ void diffRev_kernel(scalar_t* rir, scalar_t* A, scalar_t* alpha, scalar_t* tau_dp,
+__global__ void diffRev_kernel(float* rir, float* A, float* alpha, float* tau_dp,
 							   int M_src, int M_rcv, int nSamplesISM, int nSamplesDiff) {
 	
 	int sample = blockIdx.x * blockDim.x + threadIdx.x;
@@ -415,11 +426,11 @@ __global__ void diffRev_kernel(scalar_t* rir, scalar_t* A, scalar_t* alpha, scal
 	
 	if (sample<nSamplesDiff && m_src<M_src && m_rcv<M_rcv) {
 		// Get logistic distribution from uniform distribution
-		scalar_t uniform = rir[m_src*M_rcv*nSamplesDiff + m_rcv*nSamplesDiff + sample];
-		scalar_t logistic = 0.551329f * logf(uniform/(1.0f - uniform + 1e-6)); // 0.551329 == sqrt(3)/pi
+		float uniform = rir[m_src*M_rcv*nSamplesDiff + m_rcv*nSamplesDiff + sample];
+		float logistic = 0.551329f * logf(uniform/(1.0f - uniform + 1e-6)); // 0.551329 == sqrt(3)/pi
 		
 		// Apply power envelope
-		scalar_t pow_env = A[m_src*M_rcv+m_rcv] * expf(alpha[m_src*M_rcv+m_rcv] * (nSamplesISM+sample-tau_dp[m_src*M_rcv+m_rcv]));
+		float pow_env = A[m_src*M_rcv+m_rcv] * expf(alpha[m_src*M_rcv+m_rcv] * (nSamplesISM+sample-tau_dp[m_src*M_rcv+m_rcv]));
 		rir[m_src*M_rcv*nSamplesDiff + m_rcv*nSamplesDiff + sample] = sqrt(pow_env) * logistic;
 	}
 }
@@ -450,10 +461,10 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 /***************************/
 
 #if CUDART_VERSION < 9020
-__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs, scalar_t Tw_2, scalar_t Tw_inv) {
+__global__ void generateRIR_mp_kernel(half2* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, float Fs, float Tw_2, float Tw_inv) {
 	half2 h2Tw_inv = __float2half2_rn(Tw_inv);
 #else 
-__global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t* tau, int T, int M, int N, int iniRIR_N, int ini_red, scalar_t Fs, scalar_t Tw_2, half2 h2Tw_inv) {
+__global__ void generateRIR_mp_kernel(half2* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, float Fs, float Tw_2, half2 h2Tw_inv) {
 #endif
 	#if __CUDA_ARCH__ >= 530
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
@@ -463,8 +474,8 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, scalar_t* amp, scalar_t
 		
 		if (m<M && t<T) {
 			half2 loc_sum = h2zeros;
-			scalar_t loc_tim_1 = 2*t;
-			scalar_t loc_tim_2 = 2*t+1;
+			float loc_tim_1 = 2*t;
+			float loc_tim_2 = 2*t+1;
 			for (int n=n_ini; n<n_max; n++) {
 				half2 amp_mp = __float2half2_rn(amp[m*N+n]);
 				loc_sum = __hadd2(loc_sum, image_sample_mp(amp_mp, tau[m*N+n], loc_tim_1, loc_tim_2, Tw_2, h2Tw_inv));
@@ -502,7 +513,7 @@ __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, i
 	#endif
 }
 
-__global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M, int T) {
+__global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, float* floatRIR, int M, int T) {
 	#if __CUDA_ARCH__ >= 530
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
@@ -516,11 +527,70 @@ __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, scalar_t* floatRIR, int M
 	#endif
 }
 
+/************************/
+/* Lookup table KERNELS */
+/************************/
+
+__global__ void generateRIR_kernel_lut(float* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+	int t = blockIdx.x * blockDim.x + threadIdx.x;
+	int m = blockIdx.y * blockDim.y + threadIdx.y;
+	int n_ini = blockIdx.z * ini_red;
+	int n_max = fminf(n_ini + ini_red, N);
+	
+	if (m<M && t<T) {
+		float loc_sum = 0;
+		for (int n=n_ini; n<n_max; n++) {
+			loc_sum += image_sample_lut(amp[m*N+n], tau[m*N+n], t, Tw_2, sinc_lut, lut_center);
+		}
+		initialRIR[m*T*iniRIR_N + t*iniRIR_N + blockIdx.z] = loc_sum;
+	}
+}
+
 /***************************/
 /* Auxiliar host functions */
 /***************************/
 
-void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int lut_len) {
+	// Create lut in host memory
+	int lut_center = lut_len / 2;
+	float* sinc_lut_host = (float*)malloc(sizeof(float) * lut_len);
+	for (int i=0; i<=lut_center; i++) {
+		float x = (float)i / lut_oversamp;
+		float sinc = (x==0.0f)? 1.0f : sin(PI*x) / (PI*x);
+		float hann = 0.5f * (1.0f + cos(2.0f*PI*x/Tw));
+		float y = hann * sinc;
+		sinc_lut_host[lut_center+i] = y;
+		sinc_lut_host[lut_center-i] = y;
+	}
+	
+	// Copy the lut to a device cudaArray
+	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+    cudaMallocArray(cuArrayLut, &channelDesc, lut_len);
+    cudaMemcpyToArray(*cuArrayLut, 0, 0, sinc_lut_host, sizeof(float)*lut_len,
+                      cudaMemcpyHostToDevice);
+	
+	// Specify texture
+    struct cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = *cuArrayLut;
+
+	// Specify texture object parameters
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0]   = cudaAddressModeBorder;
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.readMode         = cudaReadModeElementType;
+    texDesc.normalizedCoords = 0;
+	
+	// Create texture object
+    cudaTextureObject_t texObjLut = 0;
+    cudaCreateTextureObject(&texObjLut, &resDesc, &texDesc, NULL);
+	
+	return texObjLut;
+}
+
+void gpuRIR_cuda::cuda_rirGenerator(float* rir, float* amp, float* tau, int M, int N, int T, float Fs) {
 	int initialReduction = initialReductionMin;
 	while (M * T * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
 	
@@ -528,23 +598,39 @@ void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau,
 	dim3 threadsPerBlockIni(nThreadsGen_t, nThreadsGen_m, nThreadsGen_n);
 	dim3 numBlocksIni(ceil((float)T/threadsPerBlockIni.x), ceil((float)M/threadsPerBlockIni.y), iniRIR_N);
 	
-	scalar_t* initialRIR;
-	gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(scalar_t)) );
+	float* initialRIR;
+	gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(float)) );
 	
-	scalar_t Tw = 8e-3f * Fs; // Window duration [samples]
-	generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
-	gpuErrchk( cudaDeviceSynchronize() );
-	gpuErrchk( cudaPeekAtLastError() );
+	int Tw = (int) round(8e-3f * Fs); // Window duration [samples]
+	
+	if (lookup_table) {
+		int lut_len = Tw * lut_oversamp;
+		lut_len += ((lut_len%2)? 0 : 1); // Must be odd
+		cudaArray* cuArrayLut;
+		cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
+		
+		generateRIR_kernel_lut<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
+		gpuErrchk( cudaDeviceSynchronize() );
+		gpuErrchk( cudaPeekAtLastError() );
+		
+		cudaDestroyTextureObject(sinc_lut);
+		cudaFreeArray(cuArrayLut);
+	} else {
+		generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
+		gpuErrchk( cudaDeviceSynchronize() );
+		gpuErrchk( cudaPeekAtLastError() );
+	}
+		
 	
 	dim3 threadsPerBlockRed(nThreadsRed, 1, 1);
-	scalar_t* intermediateRIR;
+	float* intermediateRIR;
 	int intRIR_N;
 	while (iniRIR_N > 2*nThreadsRed) {		
 		intRIR_N = ceil((float)iniRIR_N / (2*nThreadsRed));
-		gpuErrchk( cudaMalloc(&intermediateRIR, intRIR_N * T * M * sizeof(scalar_t)) );
+		gpuErrchk( cudaMalloc(&intermediateRIR, intRIR_N * T * M * sizeof(float)) );
 
 		dim3 numBlocksRed(intRIR_N, T, M);
-		reduceRIR_kernel<<<numBlocksRed, threadsPerBlockRed, nThreadsRed*sizeof(scalar_t)>>>(
+		reduceRIR_kernel<<<numBlocksRed, threadsPerBlockRed, nThreadsRed*sizeof(float)>>>(
 			initialRIR, intermediateRIR, M, T, iniRIR_N, intRIR_N);
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
@@ -555,14 +641,14 @@ void gpuRIR_cuda::cuda_rirGenerator(scalar_t* rir, scalar_t* amp, scalar_t* tau,
 	}
 	
 	dim3 numBlocksEnd(1, T, M);
-	reduceRIR_kernel<<<numBlocksEnd, threadsPerBlockRed, nThreadsRed*sizeof(scalar_t)>>>(
+	reduceRIR_kernel<<<numBlocksEnd, threadsPerBlockRed, nThreadsRed*sizeof(float)>>>(
 		initialRIR, rir, M, T, iniRIR_N, 1);
 	gpuErrchk( cudaDeviceSynchronize() );
 	gpuErrchk( cudaPeekAtLastError() );
 	gpuErrchk( cudaFree(initialRIR) );
 }
 
-void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, int N, int T, scalar_t Fs) {
+void cuda_rirGenerator_mp(float* rir, float* amp, float* tau, int M, int N, int T, float Fs) {
 	if (cuda_arch >= 530) {
 		int initialReduction = initialReductionMin;
 		while (M * T/2 * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
@@ -574,11 +660,11 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, in
 		half2* initialRIR;
 		gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
 
-		scalar_t Tw_2 = 8e-3f * Fs / 2;
+		float Tw_2 = 8e-3f * Fs / 2;
 		#if CUDART_VERSION < 9020
 			// For CUDA versions older than 9.2 it is nos possible to call from host code __float2half2_rn,
 			// but doing it in the kernel is slower
-			scalar_t Tw_inv = 1.0f / (8e-3f * Fs);
+			float Tw_inv = 1.0f / (8e-3f * Fs);
 		#else 
 			half2 Tw_inv = __float2half2_rn(1.0f / (8e-3f * Fs));
 		#endif
@@ -622,8 +708,8 @@ void cuda_rirGenerator_mp(scalar_t* rir, scalar_t* amp, scalar_t* tau, int M, in
 	}
 }
 
-int gpuRIR_cuda::PadData(scalar_t *signal, scalar_t **padded_signal, int segment_len,
-						 scalar_t *RIR, scalar_t **padded_RIR, int M_src, int M_rcv, int RIR_len) {
+int gpuRIR_cuda::PadData(float *signal, float **padded_signal, int segment_len,
+						 float *RIR, float **padded_RIR, int M_src, int M_rcv, int RIR_len) {
 				
     int N_fft = pow2roundup(segment_len + RIR_len - 1);
 
@@ -652,35 +738,35 @@ int gpuRIR_cuda::PadData(scalar_t *signal, scalar_t **padded_signal, int segment
 /* Principal functions */
 /***********************/
 
-scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, 
-									   scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
-									   scalar_t Tdiff, scalar_t Tmax, scalar_t Fs, scalar_t c) {	
-	// function scalar_t* cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], scalar_t* h_pos_src, int M_src, 
-	//									   scalar_t* h_pos_rcv, scalar_t* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
-	//									   scalar_t Tdiff, scalar_t Tmax, scalar_t Fs, scalar_t c);
+float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
+									   float* h_pos_rcv, float* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
+									   float Tdiff, float Tmax, float Fs, float c) {	
+	// function float* cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
+	//									   float* h_pos_rcv, float* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
+	//									   float Tdiff, float Tmax, float Fs, float c);
 	// Input parameters:
-	// 	scalar_t room_sz[3]		: Size of the room [m]
-	//	scalar_t beta[6] 		: Reflection coefficients [beta_x1 beta_x2 beta_y1 beta_y2 beta_z1 beta_z2]
-	//	scalar_t* h_pos_src 	: M_src x 3 matrix with the positions of the sources [m]
+	// 	float room_sz[3]		: Size of the room [m]
+	//	float beta[6] 		: Reflection coefficients [beta_x1 beta_x2 beta_y1 beta_y2 beta_z1 beta_z2]
+	//	float* h_pos_src 	: M_src x 3 matrix with the positions of the sources [m]
 	//	int M_src 				: Number of sources
-	//	scalar_t* h_pos_rcv 	: M_rcv x 3 matrix with the positions of the receivers [m]
-	//	scalar_t* h_orV_rcv 	: M_rcv x 3 matrix with vectors pointing in the same direction than the receivers
+	//	float* h_pos_rcv 	: M_rcv x 3 matrix with the positions of the receivers [m]
+	//	float* h_orV_rcv 	: M_rcv x 3 matrix with vectors pointing in the same direction than the receivers
 	//	micPattern mic_pattern 	: Polar pattern of the receivers (see gpuRIR_cuda.h)
 	//	int M_rcv 				: Number of receivers
 	//	int nb_img[3] 			: Number of sources in each dimension
-	//	scalar_t Tdiff			: Time when the ISM is replaced by a diffusse reverberation model [s]
-	//	scalar_t Tmax 			: RIRs length [s]
-	//	scalar_t Fs				: Sampling frequency [Hz]
-	//	scalar_t c				: Speed of sound [m/s]
+	//	float Tdiff			: Time when the ISM is replaced by a diffusse reverberation model [s]
+	//	float Tmax 			: RIRs length [s]
+	//	float Fs				: Sampling frequency [Hz]
+	//	float c				: Speed of sound [m/s]
 	
 	// Copy host memory to GPU
-	scalar_t *pos_src, *pos_rcv, *orV_rcv;
-	gpuErrchk( cudaMalloc(&pos_src, M_src*3*sizeof(scalar_t)) );
-	gpuErrchk( cudaMalloc(&pos_rcv, M_rcv*3*sizeof(scalar_t)) );
-	gpuErrchk( cudaMalloc(&orV_rcv, M_rcv*3*sizeof(scalar_t)) );
-	gpuErrchk( cudaMemcpy(pos_src, h_pos_src, M_src*3*sizeof(scalar_t), cudaMemcpyHostToDevice ) );
-	gpuErrchk( cudaMemcpy(pos_rcv, h_pos_rcv, M_rcv*3*sizeof(scalar_t), cudaMemcpyHostToDevice ) );
-	gpuErrchk( cudaMemcpy(orV_rcv, h_orV_rcv, M_rcv*3*sizeof(scalar_t), cudaMemcpyHostToDevice ) );
+	float *pos_src, *pos_rcv, *orV_rcv;
+	gpuErrchk( cudaMalloc(&pos_src, M_src*3*sizeof(float)) );
+	gpuErrchk( cudaMalloc(&pos_rcv, M_rcv*3*sizeof(float)) );
+	gpuErrchk( cudaMalloc(&orV_rcv, M_rcv*3*sizeof(float)) );
+	gpuErrchk( cudaMemcpy(pos_src, h_pos_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
+	gpuErrchk( cudaMemcpy(pos_rcv, h_pos_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
+	gpuErrchk( cudaMemcpy(orV_rcv, h_orV_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	
 	
 	// Use the ISM to calculate the amplitude and delay of each image
@@ -688,14 +774,14 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	dim3 numBlocksISM(ceil((float)nb_img[0] / nThreadsISM_x), 
 					  ceil((float)nb_img[1] / nThreadsISM_y), 
 					  ceil((float)nb_img[2] / nThreadsISM_z));
-	int shMemISM = (M_src + 2*M_rcv) * 3 * sizeof(scalar_t);
+	int shMemISM = (M_src + 2*M_rcv) * 3 * sizeof(float);
 	
-	scalar_t* amp; // Amplitude with which the signals from each image source of each source arrive to each receiver
-	gpuErrchk( cudaMalloc(&amp, M_src*M_rcv*nb_img[0]*nb_img[1]*nb_img[2]*sizeof(scalar_t)) );
-	scalar_t* tau; // Delay with which the signals from each image source of each source arrive to each receiver
-	gpuErrchk( cudaMalloc(&tau, M_src*M_rcv*nb_img[0]*nb_img[1]*nb_img[2]*sizeof(scalar_t)) );
-	scalar_t* tau_dp; // Direct path delay
-	gpuErrchk( cudaMalloc(&tau_dp, M_src*M_rcv*sizeof(scalar_t)) );
+	float* amp; // Amplitude with which the signals from each image source of each source arrive to each receiver
+	gpuErrchk( cudaMalloc(&amp, M_src*M_rcv*nb_img[0]*nb_img[1]*nb_img[2]*sizeof(float)) );
+	float* tau; // Delay with which the signals from each image source of each source arrive to each receiver
+	gpuErrchk( cudaMalloc(&tau, M_src*M_rcv*nb_img[0]*nb_img[1]*nb_img[2]*sizeof(float)) );
+	float* tau_dp; // Direct path delay
+	gpuErrchk( cudaMalloc(&tau_dp, M_src*M_rcv*sizeof(float)) );
 	
 	calcAmpTau_kernel<<<numBlocksISM, threadsPerBlockISM, shMemISM>>> (
 		amp, tau, tau_dp,
@@ -717,8 +803,8 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	// Compute the RIRs as a sum of sincs
 	int M = M_src * M_rcv;
 	int N = nb_img[0] * nb_img[1] * nb_img[2];
-	scalar_t* rirISM;
-	gpuErrchk( cudaMalloc(&rirISM, M*nSamplesISM*sizeof(scalar_t)) );
+	float* rirISM;
+	gpuErrchk( cudaMalloc(&rirISM, M*nSamplesISM*sizeof(float)) );
 	if (mixed_precision) {
 		if (cuda_arch >= 530) {
 			cuda_rirGenerator_mp(rirISM, amp, tau, M, N, nSamplesISM, Fs);
@@ -734,10 +820,10 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	dim3 numBlocksEnvPred(ceil((float)M_src / nThreadsEnvPred_x), 
 						  ceil((float)M_rcv / nThreadsEnvPred_y), 1);
 					  
-	scalar_t* A; // pow_env = A * exp(alpha * (t-tau_dp))
-	gpuErrchk( cudaMalloc(&A, M_src*M_rcv*sizeof(scalar_t)) );
-	scalar_t* alpha;
-	gpuErrchk( cudaMalloc(&alpha, M_src*M_rcv*sizeof(scalar_t)) );
+	float* A; // pow_env = A * exp(alpha * (t-tau_dp))
+	gpuErrchk( cudaMalloc(&A, M_src*M_rcv*sizeof(float)) );
+	float* alpha;
+	gpuErrchk( cudaMalloc(&alpha, M_src*M_rcv*sizeof(float)) );
 	
 	envPred_kernel<<<numBlocksEnvPred, threadsPerBlockEnvPred>>>(
 			A, alpha, rirISM, tau_dp, M_src, M_rcv, nSamplesISM, Fs,
@@ -746,8 +832,8 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	gpuErrchk( cudaPeekAtLastError() );
 	
 	// Generate diffuse reverberation
-	scalar_t* rirDiff; 
-	gpuErrchk( cudaMalloc(&rirDiff, M_src*M_rcv*nSamplesDiff*sizeof(scalar_t)) );
+	float* rirDiff; 
+	gpuErrchk( cudaMalloc(&rirDiff, M_src*M_rcv*nSamplesDiff*sizeof(float)) );
 	
 	if (nSamplesDiff != 0) {
 		// Fill rirDiff with random numbers with uniform distribution
@@ -766,21 +852,21 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	}
 	
 	// Copy GPU memory to host
-	int rirSizeISM = M_src * M_rcv * nSamplesISM * sizeof(scalar_t);
-	int rirSizeDiff = M_src * M_rcv * nSamplesDiff * sizeof(scalar_t);
-	scalar_t* h_rir = (scalar_t*) malloc(rirSizeISM+rirSizeDiff);
+	int rirSizeISM = M_src * M_rcv * nSamplesISM * sizeof(float);
+	int rirSizeDiff = M_src * M_rcv * nSamplesDiff * sizeof(float);
+	float* h_rir = (float*) malloc(rirSizeISM+rirSizeDiff);
 	
 	cudaPitchedPtr h_rir_pitchedPtr = make_cudaPitchedPtr( (void*) h_rir, 
-		(nSamplesISM+nSamplesDiff)*sizeof(scalar_t), nSamplesISM+nSamplesDiff, M_rcv );
+		(nSamplesISM+nSamplesDiff)*sizeof(float), nSamplesISM+nSamplesDiff, M_rcv );
 	cudaPitchedPtr rirISM_pitchedPtr = make_cudaPitchedPtr( (void*) rirISM, 
-		nSamplesISM*sizeof(scalar_t), nSamplesISM, M_rcv );
+		nSamplesISM*sizeof(float), nSamplesISM, M_rcv );
 	cudaPitchedPtr rirDiff_pitchedPtr = make_cudaPitchedPtr( (void*) rirDiff, 
-		nSamplesDiff*sizeof(scalar_t), nSamplesDiff, M_rcv );
+		nSamplesDiff*sizeof(float), nSamplesDiff, M_rcv );
 	
 	cudaMemcpy3DParms parmsISM = {0};
 	parmsISM.srcPtr = rirISM_pitchedPtr;
 	parmsISM.dstPtr = h_rir_pitchedPtr;
-	parmsISM.extent = make_cudaExtent(nSamplesISM*sizeof(scalar_t), M_rcv, M_src);
+	parmsISM.extent = make_cudaExtent(nSamplesISM*sizeof(float), M_rcv, M_src);
 	parmsISM.kind = cudaMemcpyDeviceToHost;
 	gpuErrchk( cudaMemcpy3D(&parmsISM) );
 	
@@ -788,8 +874,8 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 		cudaMemcpy3DParms parmsDiff = {0};
 		parmsDiff.srcPtr = rirDiff_pitchedPtr;
 		parmsDiff.dstPtr = h_rir_pitchedPtr;
-		parmsDiff.dstPos = make_cudaPos(nSamplesISM*sizeof(scalar_t), 0, 0);
-		parmsDiff.extent = make_cudaExtent(nSamplesDiff*sizeof(scalar_t), M_rcv, M_src);
+		parmsDiff.dstPos = make_cudaPos(nSamplesISM*sizeof(float), 0, 0);
+		parmsDiff.extent = make_cudaExtent(nSamplesDiff*sizeof(float), M_rcv, M_src);
 		parmsDiff.kind = cudaMemcpyDeviceToHost;
 		gpuErrchk( cudaMemcpy3D(&parmsDiff) );
 	}
@@ -809,15 +895,15 @@ scalar_t* gpuRIR_cuda::cuda_simulateRIR(scalar_t room_sz[3], scalar_t beta[6], s
 	return h_rir;
 }
 
-scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, int segment_len,
-										scalar_t* RIR, int M_rcv, int RIR_len) {	
-	// function scalar_t* cuda_filterRIR(scalar_t* source_segments, int M_src, int segments_len,
-	//									 scalar_t* RIR, int M_rcv, int RIR_len);
+float* gpuRIR_cuda::cuda_convolutions(float* source_segments, int M_src, int segment_len,
+										float* RIR, int M_rcv, int RIR_len) {	
+	// function float* cuda_filterRIR(float* source_segments, int M_src, int segments_len,
+	//									 float* RIR, int M_rcv, int RIR_len);
 	// Input parameters:
-	// 	scalar_t* source_segments : Source signal segment for each trajectory point
+	// 	float* source_segments : Source signal segment for each trajectory point
 	//	int M_src 				  : Number of trajectory points
 	//	int segment_len 		  : Length of the segments [samples]
-	//	scalar_t* RIR		 	  : 3D array with the RIR from each point of the trajectory to each receiver
+	//	float* RIR		 	  : 3D array with the RIR from each point of the trajectory to each receiver
 	//	int M_rcv 				  : Number of receivers
 	//	int RIR_len 			  : Length of the RIRs [samples]
 
@@ -825,31 +911,31 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 	int N_fft = pow2roundup(segment_len + RIR_len - 1);
 	
 	// Copy the signal segments with zero padding
-    int mem_size_signal = sizeof(scalar_t) * M_src * (N_fft+2);
+    int mem_size_signal = sizeof(float) * M_src * (N_fft+2);
     cufftComplex *d_signal;
     gpuErrchk( cudaMalloc((void **)&d_signal, mem_size_signal) );
-	gpuErrchk( cudaMemcpy2D((void *)d_signal, (N_fft+2)*sizeof(scalar_t), 
-		(void *)source_segments, segment_len*sizeof(scalar_t),
-		segment_len*sizeof(scalar_t), M_src, cudaMemcpyHostToDevice) );
-	gpuErrchk( cudaMemset2D((void *)((scalar_t *)d_signal + segment_len), (N_fft+2)*sizeof(scalar_t),
-		0, (N_fft+2-segment_len)*sizeof(scalar_t), M_src ) );
+	gpuErrchk( cudaMemcpy2D((void *)d_signal, (N_fft+2)*sizeof(float), 
+		(void *)source_segments, segment_len*sizeof(float),
+		segment_len*sizeof(float), M_src, cudaMemcpyHostToDevice) );
+	gpuErrchk( cudaMemset2D((void *)((float *)d_signal + segment_len), (N_fft+2)*sizeof(float),
+		0, (N_fft+2-segment_len)*sizeof(float), M_src ) );
 	
 	// Copy the RIRs with zero padding
 	cudaPitchedPtr h_RIR_pitchedPtr = make_cudaPitchedPtr( (void*) RIR, 
-		RIR_len*sizeof(scalar_t), RIR_len, M_rcv );
-    int mem_size_RIR = sizeof(scalar_t) * M_src * M_rcv * (N_fft+2);
+		RIR_len*sizeof(float), RIR_len, M_rcv );
+    int mem_size_RIR = sizeof(float) * M_src * M_rcv * (N_fft+2);
 	cufftComplex *d_RIR;
 	gpuErrchk( cudaMalloc((void **)&d_RIR, mem_size_RIR) );
 	cudaPitchedPtr d_RIR_pitchedPtr = make_cudaPitchedPtr( (void*) d_RIR, 
-		(N_fft+2)*sizeof(scalar_t), (N_fft+2), M_rcv );
+		(N_fft+2)*sizeof(float), (N_fft+2), M_rcv );
 	cudaMemcpy3DParms parmsCopySignal = {0};
 	parmsCopySignal.srcPtr = h_RIR_pitchedPtr;
 	parmsCopySignal.dstPtr = d_RIR_pitchedPtr;
-	parmsCopySignal.extent = make_cudaExtent(RIR_len*sizeof(scalar_t), M_rcv, M_src);
+	parmsCopySignal.extent = make_cudaExtent(RIR_len*sizeof(float), M_rcv, M_src);
 	parmsCopySignal.kind = cudaMemcpyHostToDevice;
 	gpuErrchk( cudaMemcpy3D(&parmsCopySignal) );
-	gpuErrchk( cudaMemset2D((void *)((scalar_t *)d_RIR + RIR_len), (N_fft+2)*sizeof(scalar_t),
-		0, (N_fft+2-RIR_len)*sizeof(scalar_t), M_rcv*M_src ) );
+	gpuErrchk( cudaMemset2D((void *)((float *)d_RIR + RIR_len), (N_fft+2)*sizeof(float),
+		0, (N_fft+2-RIR_len)*sizeof(float), M_rcv*M_src ) );
 	
 	// CUFFT plans
     cufftHandle plan_signal, plan_RIR, plan_RIR_inv;
@@ -877,15 +963,15 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 	
 	// Copy device memory to host
 	int conv_len = segment_len + RIR_len - 1;
-    scalar_t *convolved_segments = (scalar_t *)malloc(sizeof(scalar_t)*M_src*M_rcv*conv_len);
+    float *convolved_segments = (float *)malloc(sizeof(float)*M_src*M_rcv*conv_len);
 	cudaPitchedPtr d_convolved_segments_pitchedPtr = make_cudaPitchedPtr( (void*) d_RIR, 
-		(N_fft+2)*sizeof(scalar_t), conv_len, M_rcv );
+		(N_fft+2)*sizeof(float), conv_len, M_rcv );
 	cudaPitchedPtr h_convolved_segments_pitchedPtr = make_cudaPitchedPtr( (void*) convolved_segments, 
-		conv_len*sizeof(scalar_t), conv_len, M_rcv );
+		conv_len*sizeof(float), conv_len, M_rcv );
 	cudaMemcpy3DParms parmsCopy = {0};
 	parmsCopy.srcPtr = d_convolved_segments_pitchedPtr;
 	parmsCopy.dstPtr = h_convolved_segments_pitchedPtr;
-	parmsCopy.extent = make_cudaExtent(conv_len*sizeof(scalar_t), M_rcv, M_src);
+	parmsCopy.extent = make_cudaExtent(conv_len*sizeof(float), M_rcv, M_src);
 	parmsCopy.kind = cudaMemcpyDeviceToHost;
 	gpuErrchk( cudaMemcpy3D(&parmsCopy) );
 
@@ -901,18 +987,19 @@ scalar_t* gpuRIR_cuda::cuda_convolutions(scalar_t* source_segments, int M_src, i
 	return convolved_segments;
 }
 
-gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
+gpuRIR_cuda::gpuRIR_cuda(bool mPrecision, bool lut) {
 	// Get CUDA architecture
 	cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
 	cuda_arch = prop.major*100 + prop.minor*10;
 
-	// Activate mixed precision if selected
+	// Activate mixed precision and lut if selected
 	activate_mixed_precision(mPrecision);
+	activate_lut(lut);
 	
 	// Initiate CUDA runtime API
-	scalar_t* memPtr_warmup;
-	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(scalar_t)) );
+	float* memPtr_warmup;
+	gpuErrchk( cudaMalloc(&memPtr_warmup, 1*sizeof(float)) );
 	gpuErrchk( cudaFree(memPtr_warmup) );
 	
 	// Initiate cuFFT library
@@ -927,10 +1014,25 @@ gpuRIR_cuda::gpuRIR_cuda(bool mPrecision) {
 
 bool gpuRIR_cuda::activate_mixed_precision(bool activate) {
 	if (cuda_arch >= 530) {
+		if (activate && lookup_table) {
+			printf("The mixed precision implementation is not compatible with the lookup table.\n");
+			printf("Disabling the lookup table.\n");
+			lookup_table = false;
+		}
 		mixed_precision = activate;
 	} else {
 		if (activate) printf("This feature requires Pascal GPU architecture or higher.\n");
 		mixed_precision = false;
 	}
 	return mixed_precision;
+}
+
+bool gpuRIR_cuda::activate_lut(bool activate) {
+	if (activate && mixed_precision) {
+		printf("The lookup table is not compatible with the mixed precision implementation.\n");
+		printf("Disabling the mixed precision implementation.\n");
+		mixed_precision = false;
+	}
+	lookup_table = activate;
+	return lookup_table;
 }

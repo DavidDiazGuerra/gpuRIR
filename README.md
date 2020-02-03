@@ -10,6 +10,7 @@
   * [`simulateRIR`](#simulaterir)
   * [`simulateTrajectory`](#simulatetrajectory)
   * [`activateMixedPrecision`](#activateMixedPrecision)
+  * [`activateLUT`](#activateLUT)
   * [`beta_SabineEstimation`](#beta_sabineestimation)
   * [`att2t_SabineEstimator`](#att2t_sabineestimator)
   * [`t2n`](#t2n)
@@ -110,7 +111,16 @@ Activate the mixed precision mode, only for Pascal GPU architecture or superior.
 
 * **activate** : *bool, optional.*
         True for activate and Flase for deactivate. True by default.
-        
+
+### `activateLUT`
+
+Activate the lookup table for the sinc computations.
+
+#### Parameters
+
+* **activate** : *bool, optional.*
+        True for activate and Flase for deactivate. True by default.
+
 ### `beta_SabineEstimation`
 
 Estimation of the reflection coefficients needed to have the desired reverberation time.

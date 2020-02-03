@@ -1,8 +1,4 @@
 
-
-typedef float scalar_t;
-//typedef float2 Complex;
-
 // Accepted polar patterns for the receivers:
 typedef int micPattern;
 #define DIR_OMNI 0
@@ -19,11 +15,12 @@ struct cuRandGeneratorWrapper_t;
 class gpuRIR_cuda {
 	
 	public:
-		gpuRIR_cuda(bool);
+		gpuRIR_cuda(bool, bool);
 
-		scalar_t* cuda_simulateRIR(scalar_t[3], scalar_t[6], scalar_t*, int, scalar_t*, scalar_t*, micPattern, int, int[3], scalar_t, scalar_t, scalar_t, scalar_t);
-		scalar_t* cuda_convolutions(scalar_t*, int, int,scalar_t*, int, int);
+		float* cuda_simulateRIR(float[3], float[6], float*, int, float*, float*, micPattern, int, int[3], float, float, float, float);
+		float* cuda_convolutions(float*, int, int, float*, int, int);
 		bool activate_mixed_precision(bool);
+		bool activate_lut(bool);
 		
 	private:
 		// cuRAND generator
@@ -31,8 +28,11 @@ class gpuRIR_cuda {
 		
 		// Mixed precision flag
 		bool mixed_precision;
+		
+		// Lookup table flag
+		bool lookup_table;
 
 		// Auxiliar host functions
-		void cuda_rirGenerator(scalar_t*, scalar_t*, scalar_t*, int, int, int, scalar_t);
-		int PadData(scalar_t*, scalar_t**, int, scalar_t*, scalar_t**, int, int, int);
+		void cuda_rirGenerator(float*, float*, float*, int, int, int, float);
+		int PadData(float*, float**, int, float*, float**, int, int, int);
 };
