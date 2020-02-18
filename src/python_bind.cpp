@@ -107,11 +107,11 @@ py::array gpuRIR_bind::gpu_conv(py::array_t<float, py::array::c_style> source_se
 }
 
 bool gpuRIR_bind::activate_mixed_precision_bind(bool activate) {
-  gpuRIR_cuda_simulator.activate_mixed_precision(activate);
+    return gpuRIR_cuda_simulator.activate_mixed_precision(activate);
 }
 
 bool gpuRIR_bind::activate_lut_bind(bool activate) {
-  gpuRIR_cuda_simulator.activate_lut(activate);
+    return gpuRIR_cuda_simulator.activate_lut(activate);
 }
 
 
