@@ -101,8 +101,8 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 		Size of the room (in meters).
 	beta : array_like with 6 elements
 		Reflection coefficients of the walls as $[beta_{x0}, beta_{x1}, beta_{y0}, beta_{y1}, beta_{z0}, beta_{z1}]$,
-		where $beta_{x0}$ is the coeffcient of the wall parallel to the x axis closest
-		to the origin of coordinates system and $beta_{x1}$ the farthest.
+		where $beta_{x0}$ and $beta_{x1}$ are the reflection coefficents of the walls orthogonal to the x axis at
+		x=0 and x=room_sz[0], respectively.
 	pos_src, pos_rcv : ndarray with 2 dimensions and 3 columns
 		Position of the sources and the receivers (in meters).
 	nb_img : array_like with 3 integer elements
