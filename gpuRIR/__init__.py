@@ -139,8 +139,8 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 	the GPU memory and crash the kernel.
 
 	'''
-	assert np.sum(pos_src >= room_sz) == 0, "The sources must be inside the room"
-	assert np.sum(pos_rcv >= room_sz) == 0, "The receivers must be inside the room"
+	assert not ((pos_src >= room_sz).any() or (pos_src <= 0).any()), "The sources must be inside the room"
+	assert not ((pos_rcv >= room_sz).any() or (pos_rcv <= 0).any()), "The receivers must be inside the room"
 	assert Tdiff is None or Tdiff <= Tmax, "Tmax must be equal or greater than Tdiff"
 	assert mic_pattern in mic_patterns, "mic_pattern must be omni, homni, card, hypcard, subcard or bidir"
 	assert mic_pattern is "omni" or orV_rcv is not None, "the mics are not omni but their orientation is undefined"
