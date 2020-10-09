@@ -176,7 +176,7 @@ Estimation of the number of images needed for a correct RIR simulation.
 
 ## References
 
-[1] D. Diaz-Guerra, A. Miguel, J.R. Beltran, "gpuRIR: A python library for Room Impulse Response simulation with GPU acceleration," [[arXiv preprint](https://arxiv.org/abs/1810.11359)].
+[1] Diaz-Guerra, D., Miguel, A. & Beltran, J.R. gpuRIR: A python library for room impulse response simulation with GPU acceleration. Multimed Tools Appl (2020). [[DOI](https://doi.org/10.1007/s11042-020-09905-3)] [[SharedIt](https://rdcu.be/b8gzW)] [[arXiv preprint](https://arxiv.org/abs/1810.11359)]
 
 
 
