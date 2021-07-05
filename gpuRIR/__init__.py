@@ -41,7 +41,6 @@ def beta_SabineEstimation(room_sz, T60, abs_weights=[1.0]*6):
 	'''
 
 	def t60error(x, T60, room_sz, abs_weights):
-		abs_weights /= np.array(abs_weights).max()
 		alpha = x * abs_weights
 		Sa = (alpha[0]+alpha[1]) * room_sz[1]*room_sz[2] + \
 			(alpha[2]+alpha[3]) * room_sz[0]*room_sz[2] + \
@@ -50,6 +49,7 @@ def beta_SabineEstimation(room_sz, T60, abs_weights=[1.0]*6):
 		if Sa == 0: return T60 - 0 # Anechoic chamber 
 		return abs(T60 - 0.161 * V / Sa) # Sabine's formula
 	
+	abs_weights /= np.array(abs_weights).max()
 	result = minimize(t60error, 0.5, args=(T60, room_sz, abs_weights), bounds=[[0, 1]])		
 	return np.sqrt(1 - result.x * abs_weights).astype(np.float32)
 	
