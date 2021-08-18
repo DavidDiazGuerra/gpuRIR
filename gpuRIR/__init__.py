@@ -143,7 +143,7 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 	assert not ((pos_rcv >= room_sz).any() or (pos_rcv <= 0).any()), "The receivers must be inside the room"
 	assert Tdiff is None or Tdiff <= Tmax, "Tmax must be equal or greater than Tdiff"
 	assert mic_pattern in mic_patterns, "mic_pattern must be omni, homni, card, hypcard, subcard or bidir"
-	assert mic_pattern is "omni" or orV_rcv is not None, "the mics are not omni but their orientation is undefined"
+	assert mic_pattern == "omni" or orV_rcv is not None, "the mics are not omni but their orientation is undefined"
 	
 	pos_src = pos_src.astype('float32', order='C', copy=False)
 	pos_rcv = pos_rcv.astype('float32', order='C', copy=False)
