@@ -173,6 +173,3 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     alpha_iso = 8.686*f**2*taur**(1/2)*(1.84*10**(-11)/pr+taur**(-3)*(b1+b2))
 
     return [alpha, alpha_iso, c, c_iso]
-
-
-print(air_absorption())

@@ -4,7 +4,7 @@ import librosa.display
 import numpy as np
 import matplotlib.pyplot as plt
 
-waveform, sample_rate = librosa.load('/home/oliver/Downloads/song.wav')
+waveform, sample_rate = librosa.load('impulse_response_rcv_atten_2_1631652651.3554087.wav')
 
 def to_decibles(signal):
     # Perform short time Fourier Transformation of signal and take absolute value of results
