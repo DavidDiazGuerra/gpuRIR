@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 from scipy.io import wavfile
 #from scipy import fft
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, lfilter, buttord
 import time
 
 import gpuRIR
@@ -41,13 +41,11 @@ receiver_channels = RIRs[0] # Extract receiver channels (mono) from RIRs.
 '''
 Parameters relating to air absorption
 '''
-divisions=5 # How many partitions the frequency spectrum gets divided into.
-min_frequency=1.0 # [Hz] Lower frequency boundary.
+divisions=2 # How many partitions the frequency spectrum gets divided into. Roughly correlates to quality / accuracy.
+min_frequency=0.0 # [Hz] Lower frequency boundary.
 max_frequency=20000.0 # [Hz] Upper frequency boundary.
 
 frequency_range=max_frequency - min_frequency
-nyq = 0.5 * fs
-
 
 '''
 Calculates how much distance the sound has travelled. [m]
@@ -56,35 +54,54 @@ def distance_travelled(sample_number, sampling_frequency, c):
     seconds_passed=sample_number*(sampling_frequency**(-1))
     return (seconds_passed*c) # [m]
 
+def hertz_to_rad_s(freq):
+    return 2*np.pi*freq
+
+def butter_bandpass(lowcut, highcut, fs, order=6):
+    nyq = 0.5 * fs
+    low = (lowcut / nyq)
+    high = highcut / nyq
+    print(f"low: {low} high: {high}")
+    b, a = butter(order, [low, high], btype='band', fs=fs, analog=True)
+    return b, a
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=6):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
 for i in range(0, len(pos_rcv)):
     source_signal=np.copy(receiver_channels[i])
     combined_signals=np.zeros(len(source_signal))
-
+    
     # Divide frequency range into defined chunks
     for j in range(1, divisions + 1):
+        
         band_max = ((frequency_range / divisions) * j)
         band_min = ((frequency_range / divisions) * (j - 1))
+        
         band_mean = (band_max+band_min)/2
         print(f"bin {j}: min:{band_min} max:{band_max} mean:{band_mean}")
-
+    
         # Prepare bandpass filter
-        b, a = butter(6, [band_min /nyq, band_max /nyq], btype='band')
+        filtered_signal=butter_bandpass_filter(source_signal, band_min, band_max, fs, 6)
 
         # Apply bandpass filter
-        filtered_signal = lfilter(b, a, source_signal)
         print(filtered_signal)
 
         # Apply attenuation
-        '''
+        
         for k in range(0, len(filtered_signal)):
             alpha, alpha_iso, c, c_iso = aa.air_absorption(band_mean)
             distance = distance_travelled(k, fs, c)
             attenuation = distance*alpha  # [dB]
 
             filtered_signal[k] *= 10**(-attenuation / 10)
-        '''
-        combined_signals += filtered_signal
         
+        for k in range(0, len(combined_signals)):
+            combined_signals[k] += filtered_signal[k]
+    
+    combined_signals=source_signal
 
     # Stack array vertically
     impulseResponseArray = np.vstack(combined_signals)
@@ -97,13 +114,13 @@ for i in range(0, len(pos_rcv)):
     impulseResponseArray = np.concatenate((impulseResponseArray, impulseResponseArray), axis=1)
 
     #impulseResponseArray=impulseResponseArray[1]
-    #print(impulseResponseArray)
+    print(impulseResponseArray)
 
     # Write impulse response file
     wavfile.write(f'impulse_response_rcv_atten_{i}_{time.time()}.wav', fs, impulseResponseArray.astype(bit_depth))
 
     # Visualize waveform of IR
-    #plt.plot(impulseResponseArray)
+    plt.plot(impulseResponseArray)
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
-#plt.show()
+plt.show()
