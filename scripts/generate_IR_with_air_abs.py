@@ -62,7 +62,7 @@ def butter_bandpass(lowcut, highcut, fs, order=6):
     low = (lowcut / nyq)
     high = highcut / nyq
     print(f"low: {low} high: {high}")
-    b, a = butter(order, [low, high], btype='band', fs=fs, analog=True)
+    b, a = butter(order, [low, high], btype='band', analog=True)
     return b, a
 
 def butter_bandpass_filter(data, lowcut, highcut, fs, order=6):
@@ -101,8 +101,6 @@ for i in range(0, len(pos_rcv)):
         for k in range(0, len(combined_signals)):
             combined_signals[k] += filtered_signal[k]
     
-    combined_signals=source_signal
-
     # Stack array vertically
     impulseResponseArray = np.vstack(combined_signals)
 
