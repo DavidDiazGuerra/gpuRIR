@@ -40,8 +40,8 @@ receiver_channels = RIRs[0] # Extract receiver channels (mono) from RIRs.
 '''
 Parameters relating to air absorption
 '''
-enable_air_absorption=False # Determines if air absorption is applied.
-divisions=10 # How many partitions the frequency spectrum gets divided into. Roughly correlates to quality / accuracy.
+enable_air_absorption=True # Determines if air absorption is applied.
+divisions=50 # How many partitions the frequency spectrum gets divided into. Roughly correlates to quality / accuracy.
 min_frequency=20.0 # [Hz] Lower frequency boundary.
 max_frequency=20000.0 # [Hz] Upper frequency boundary.
 
@@ -58,7 +58,7 @@ def distance_travelled(sample_number, sampling_frequency, c):
 '''
 Returns a butterworth bandpass filter.
 '''
-def create_bandpass_filter(lowcut, highcut, fs, order=6):
+def create_bandpass_filter(lowcut, highcut, fs, order=3):
     nyq = 0.5 * fs
     low = (lowcut / nyq)
     high = highcut / nyq
@@ -69,7 +69,7 @@ def create_bandpass_filter(lowcut, highcut, fs, order=6):
 '''
 Applies a butterworth bandpass filter.
 '''
-def apply_bandpass_filter(data, lowcut, highcut, fs, order=6):
+def apply_bandpass_filter(data, lowcut, highcut, fs, order=3):
     b, a = create_bandpass_filter(lowcut, highcut, fs, order=order)
     y = lfilter(b, a, data)
     return y
