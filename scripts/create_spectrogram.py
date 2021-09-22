@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-file_path = 'Nickelback_-_Photograph.wav'
+file_path = 'impulse_response_rcv_atten_0_1632315495.4742222.wav'
 sample_rate = 0
 
 if len(sys.argv) > 1:

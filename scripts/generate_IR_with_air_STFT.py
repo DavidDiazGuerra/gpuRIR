@@ -8,10 +8,10 @@ import numpy.matlib
 import matplotlib.pyplot as plt
 from math import ceil
 from scipy.io import wavfile
-from scipy.signal import butter, lfilter, buttord
+from scipy.signal import istft, stft
 import time
 import gpuRIR
-from create_spectrogram import create_spectrogram
+#from create_spectrogram import create_spectrogram
 
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
@@ -42,7 +42,7 @@ receiver_channels = RIRs[0] # Extract receiver channels (mono) from RIRs.
 Parameters relating to air absorption
 '''
 enable_air_absorption=True # Determines if air absorption is applied.
-divisions=50 # How many partitions the frequency spectrum gets divided into. Roughly correlates to quality / accuracy.
+divisions=1 # How many partitions the frequency spectrum gets divided into. Roughly correlates to quality / accuracy.
 min_frequency=20.0 # [Hz] Lower frequency boundary.
 max_frequency=20000.0 # [Hz] Upper frequency boundary.
 
@@ -56,24 +56,31 @@ def distance_travelled(sample_number, sampling_frequency, c):
     return (seconds_passed*c) # [m]
 
 
-'''
-Returns a butterworth bandpass filter.
-'''
-def create_bandpass_filter(lowcut, highcut, fs, order=3):
-    nyq = 0.5 * fs
-    low = (lowcut / nyq)
-    high = highcut / nyq
-    b, a = butter(order, [low, high], btype='bandpass')
-    return b, a
+def STFT_air_absorption(RIR, T, hr, ps, fs, nFFT=256, noverlap=int(256*0.75), window='hanning'):
+
+  # Calculate STFT of RIR (like spectrogram)
+    f, t, RIR_TF = stft(RIR, fs, window, nperseg=nFFT, noverlap=noverlap, nfft=nFFT, boundary='even', padded=True, return_onesided=False)
+
+  # Get air absorption coeffs for given configuration, coeffs are in dB/meter
+    alphas_t0, alpha_iso, c, c_iso = aa.air_absorption(f, T, hr, ps)
+
+  # Get air absorption coeffs over distance/time for each band
+    alphas = np.zeros((len(f), len(t)))
+    for ii in range(len(t)):
+        alphas[:, ii] = -alphas_t0*t[ii]*c
+
+  # Set lower bound for attenuation
+    alphas[alphas < -100] = -100
+
+  # Get linear absorption coeffs and apply them to the STFT of the RIR
+    RIR_TF_processed = RIR_TF*np.power(10, (alphas/20))
+
+  # Transform processed STFT of RIR back to time domain
+    _, RIR_processed = istft(RIR_TF_processed, fs, window, nperseg=nFFT, noverlap=noverlap, nfft=nFFT)
+    RIR_processed = RIR_processed[0:len(RIR)]
+    return RIR_processed
 
 
-'''
-Applies a butterworth bandpass filter.
-'''
-def apply_bandpass_filter(data, lowcut, highcut, fs, order=3):
-    b, a = create_bandpass_filter(lowcut, highcut, fs, order=order)
-    y = lfilter(b, a, data)
-    return y
 
 '''
 Increases amplitude (loudness) to defined ceiling.
@@ -95,41 +102,14 @@ def automatic_gain_increase(data, bit_depth, ceiling):
 for i in range(0, len(pos_rcv)):
     # Prepare sound data arrays.
     source_signal=np.copy(receiver_channels[i])
-    combined_signals=np.zeros(len(source_signal))
 
-    # Divide frequency range into defined frequency bands
-    for j in range(1, divisions + 1):
-        # Upper ceiling of each band
-        band_max = ((frequency_range / divisions) * j)
+    # Apply STFT based air absorption
+    source_signal=STFT_air_absorption(source_signal, 25, 50, 1, fs)
 
-        # Lower ceiling of each band and handling of edge case
-        if j == 1:
-            band_min = min_frequency
-        else:
-            band_min = ((frequency_range / divisions) * (j - 1))
-
-        # Calculating mean frequency of band which determines the attenuation.
-        band_mean = (band_max+band_min)/2
-        print(f"Band {j} frequencies: min: {band_min} max: {band_max} mean:{band_mean}")
-
-        # Prepare + apply bandpass filter
-        filtered_signal = apply_bandpass_filter(source_signal, band_min, band_max, fs, 3)
-
-        # Apply attenuation
-        if enable_air_absorption:
-            for k in range(0, len(filtered_signal)):
-                alpha, alpha_iso, c, c_iso = aa.air_absorption(band_mean)
-                distance = distance_travelled(k, fs, c)
-                attenuation = distance*alpha  # [dB]
-
-                filtered_signal[k] *= 10**(-attenuation / 10)
-
-        # Summing the different bands together
-        for k in range(0, len(combined_signals)):
-            combined_signals[k] += filtered_signal[k]
+    print(source_signal)
 
     # Stack array vertically
-    impulseResponseArray = np.vstack(combined_signals)
+    impulseResponseArray = np.vstack(source_signal)
 
     # Increase Amplitude to usable levels 
     # ye olde timey way to increase ampliude: impulseResponseArray = impulseResponseArray * np.iinfo(bit_depth).max
@@ -143,10 +123,12 @@ for i in range(0, len(pos_rcv)):
     # Write impulse response file
     filename = f'impulse_response_rcv_atten_{i}_{time.time()}.wav'
     wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
-    create_spectrogram(filename)
+    #create_spectrogram(filename)
 
     # Visualize waveform of IR
     plt.plot(impulseResponseArray)
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
 plt.show()
+
+
