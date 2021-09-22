@@ -11,6 +11,7 @@ from scipy.io import wavfile
 from scipy.signal import butter, lfilter, buttord
 import time
 import gpuRIR
+from create_spectrogram import create_spectrogram
 
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
@@ -137,11 +138,12 @@ for i in range(0, len(pos_rcv)):
     # Create stereo file (dual mono)
     impulseResponseArray = np.concatenate((impulseResponseArray, impulseResponseArray), axis=1)
 
-    #impulseResponseArray=impulseResponseArray[1]
     print(impulseResponseArray)
 
     # Write impulse response file
-    wavfile.write(f'impulse_response_rcv_atten_{i}_{time.time()}.wav', fs, impulseResponseArray.astype(bit_depth))
+    filename = f'impulse_response_rcv_atten_{i}_{time.time()}.wav'
+    wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
+    create_spectrogram(filename)
 
     # Visualize waveform of IR
     plt.plot(impulseResponseArray)

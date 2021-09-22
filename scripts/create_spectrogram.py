@@ -1,10 +1,20 @@
 
 import librosa
 import librosa.display
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-waveform, sample_rate = librosa.load('without_air_abs.wav')
+file_path = 'Nickelback_-_Photograph.wav'
+sample_rate = 0
+
+if len(sys.argv) > 1:
+    file_path = sys.argv[1]
+
+def create_spectrogram(inner_file_path):
+    waveform, sample_rate = librosa.load(inner_file_path)
+    plot_spec(to_decibles(waveform), sample_rate, 'Guitar')
+    plt.show()
 
 def to_decibles(signal):
     # Perform short time Fourier Transformation of signal and take absolute value of results
@@ -20,5 +30,5 @@ def plot_spec(D, sr, instrument):
     ax.set(title = f'Sample rate: {sample_rate}')
     fig.colorbar(spec)
 
-plot_spec(to_decibles(waveform), sample_rate, 'Guitar')
-plt.show()
+print(f"Opening {file_path}...")
+create_spectrogram(file_path)
