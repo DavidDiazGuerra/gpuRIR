@@ -71,9 +71,9 @@ def automatic_gain_increase(data, bit_depth, ceiling):
 for i in range(0, len(pos_rcv)):
     # Prepare sound data arrays.
     #source_signal=np.copy(receiver_channels[i])
-    source_signal, sample_rate = librosa.load('ex.wav')
+    source_signal, sample_rate = librosa.load('impulse_response_rcv_2_1630943682.2650945.wav')
 
-    filtered_signal = Filter().apply(Bandpass(), source_signal, params = {
+    filtered_signal = Filter(Bandpass()).apply(source_signal, params = {
         "fs": sample_rate,
         "max_frequency": 20000,
         "min_frequency": 10,

@@ -6,6 +6,13 @@ import air_absorption_calculation as aa
 
 
 class Bandpass(FilterStrategy):
+
+    def __init__(self, max_frequency, min_frequency, divisions, fs):
+        self.max_frequency = max_frequency
+        self.min_frequency = min_frequency
+        self.divisions = divisions
+        self.fs = fs
+
     '''
     Calculates how much distance the sound has travelled. [m]
     '''
@@ -31,21 +38,21 @@ class Bandpass(FilterStrategy):
         y = lfilter(b, a, data)
         return y
 
-    def air_absorption_bandpass(self, IR, params): # max_frequency, min_frequency, divisions, fs
-        frequency_range = params.max_frequency - params.min_frequency
+    def air_absorption_bandpass(self, IR): # max_frequency, min_frequency, divisions, fs
+        frequency_range = self.max_frequency - self.min_frequency
 
         combined_signals = np.zeros(len(IR))
 
         # Divide frequency range into defined frequency bands
-        for j in range(1, params.divisions + 1):
+        for j in range(1, self.divisions + 1):
             # Upper ceiling of each band
-            band_max = ((frequency_range / params.divisions) * j)
+            band_max = ((frequency_range / self.divisions) * j)
 
             # Lower ceiling of each band and handling of edge case
             if j == 1:
-                band_min = params.min_frequency
+                band_min = self.min_frequency
             else:
-                band_min = ((frequency_range / params.divisions) * (j - 1))
+                band_min = ((frequency_range / self.divisions) * (j - 1))
 
             # Calculating mean frequency of band which determines the attenuation.
             band_mean = (band_max+band_min)/2
@@ -54,12 +61,12 @@ class Bandpass(FilterStrategy):
 
             # Prepare + apply bandpass filter
             filtered_signal = self.apply_bandpass_filter(
-                IR, band_min, band_max, params.fs, 3)
+                IR, band_min, band_max, self.fs, 3)
 
             # Apply attenuation
             for k in range(0, len(filtered_signal)):
                 alpha, alpha_iso, c, c_iso = aa.air_absorption(band_mean)
-                distance = self.distance_travelled(k, params.fs, c)
+                distance = self.distance_travelled(k, self.fs, c)
                 attenuation = distance*alpha  # [dB]
 
                 filtered_signal[k] *= 10**(-attenuation / 10)
@@ -68,5 +75,5 @@ class Bandpass(FilterStrategy):
             for k in range(0, len(combined_signals)):
                 combined_signals[k] += filtered_signal[k]
 
-    def apply(self, IR, params):
-        return self.air_absorption_bandpass(IR, params)
+    def apply(self, IR):
+        return self.air_absorption_bandpass(IR)
