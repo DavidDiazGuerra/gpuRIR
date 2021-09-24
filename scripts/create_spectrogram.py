@@ -5,15 +5,12 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-file_path = 'impulse_response_rcv_atten_0_1632315495.4742222.wav'
-sample_rate = 0
-
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
 
 def create_spectrogram(inner_file_path):
     waveform, sample_rate = librosa.load(inner_file_path)
-    plot_spec(to_decibles(waveform), sample_rate, 'Guitar')
+    plot_spec(to_decibles(waveform), sample_rate)
     plt.show()
 
 def to_decibles(signal):
@@ -24,11 +21,8 @@ def to_decibles(signal):
     return D # Return converted audio signal
 
 # Function to plot the converted audio signal
-def plot_spec(D, sr, instrument):
+def plot_spec(D, sr):
     fig, ax = plt.subplots(figsize = (30,10))
     spec = librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='linear', ax=ax)
-    ax.set(title = f'Sample rate: {sample_rate}')
+    ax.set(title = f'Sample rate: {sr}')
     fig.colorbar(spec)
-
-print(f"Opening {file_path}...")
-create_spectrogram(file_path)
