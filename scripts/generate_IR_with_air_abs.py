@@ -68,6 +68,8 @@ def automatic_gain_increase(data, bit_depth, ceiling):
 
     return data*factor
 
+def create_soundfile(data, fs, filename):
+    wavfile.write(filename, fs, data)
 
 def generate_IR(source, filter):
     # Prepare sound data arrays.
@@ -90,13 +92,14 @@ def generate_IR(source, filter):
     print(impulseResponseArray)
 
     # Write impulse response file
-    filename = f'impulse_response_rcv_atten_{filter.NAME}_{i}_{time.time()}.wav'
-    wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
-    #create_spectrogram(filename)
+    filename=f'impulse_response_rcv_atten_{filter.NAME}_{i}_{time.time()}.wav'
+    create_soundfile(impulseResponseArray.astype(bit_depth), fs, filename)
+    
+    # Create spectrogram
+    create_spectrogram(filename)
 
     # Visualize waveform of IR
     plt.plot(impulseResponseArray)
-
 
     return impulseResponseArray
 
@@ -104,6 +107,14 @@ def generate_IR(source, filter):
 for i in range(0, len(pos_rcv)):
     bandpass_data=generate_IR(receiver_channels[i], Bandpass())
     stft_data=generate_IR(receiver_channels[i], STFT())
+
+    # Calculate and visualize difference of two waveforms
+    difference=bandpass_data-stft_data
+    plt.plot(difference)
+    difference_filename=f'difference_{time.time()}.wav'
+    create_soundfile(difference, fs, difference_filename)
+    create_spectrogram(difference_filename)
+
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
 plt.show()

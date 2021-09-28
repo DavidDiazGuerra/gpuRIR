@@ -6,7 +6,7 @@ import air_absorption_calculation as aa
 
 class Bandpass(FilterStrategy):
 
-    def __init__(self, max_frequency=20000, min_frequency=1, divisions=15, fs=44100):
+    def __init__(self, max_frequency=20000, min_frequency=1, divisions=30, fs=44100):
         self.max_frequency = max_frequency
         self.min_frequency = min_frequency
         self.divisions = divisions
