@@ -4,10 +4,9 @@ from scipy.signal import butter, lfilter
 import air_absorption_calculation as aa
 
 
-
 class Bandpass(FilterStrategy):
 
-    def __init__(self, max_frequency, min_frequency, divisions, fs):
+    def __init__(self, max_frequency=20000, min_frequency=1, divisions=1, fs=44100):
         self.max_frequency = max_frequency
         self.min_frequency = min_frequency
         self.divisions = divisions
@@ -16,6 +15,7 @@ class Bandpass(FilterStrategy):
     '''
     Calculates how much distance the sound has travelled. [m]
     '''
+
     def distance_travelled(self, sample_number, sampling_frequency, c):
         seconds_passed = sample_number*(sampling_frequency**(-1))
         return (seconds_passed*c)  # [m]
@@ -23,6 +23,7 @@ class Bandpass(FilterStrategy):
     '''
     Returns a butterworth bandpass filter.
     '''
+
     def create_bandpass_filter(self, lowcut, highcut, fs, order=3):
         nyq = 0.5 * fs
         low = (lowcut / nyq)
@@ -33,12 +34,14 @@ class Bandpass(FilterStrategy):
     '''
     Applies a butterworth bandpass filter.
     '''
+
     def apply_bandpass_filter(self, data, lowcut, highcut, fs, order=3):
         b, a = self.create_bandpass_filter(lowcut, highcut, fs, order=order)
         y = lfilter(b, a, data)
         return y
 
-    def air_absorption_bandpass(self, IR): # max_frequency, min_frequency, divisions, fs
+    # max_frequency, min_frequency, divisions, fs
+    def air_absorption_bandpass(self, IR):
         frequency_range = self.max_frequency - self.min_frequency
 
         combined_signals = np.zeros(len(IR))
@@ -74,6 +77,8 @@ class Bandpass(FilterStrategy):
             # Summing the different bands together
             for k in range(0, len(combined_signals)):
                 combined_signals[k] += filtered_signal[k]
+        
+        return combined_signals
 
     def apply(self, IR):
         return self.air_absorption_bandpass(IR)
