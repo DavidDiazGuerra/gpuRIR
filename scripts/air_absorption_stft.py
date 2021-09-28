@@ -14,6 +14,7 @@ class STFT(FilterStrategy):
         self.nFFT = nFFT
         self.noverlap = noverlap
         self.window = window
+        self.NAME="STFT"
 
     def STFT_air_absorption(self, RIR):
 

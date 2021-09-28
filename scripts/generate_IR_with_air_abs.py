@@ -5,6 +5,8 @@ Example usage: Convolving (reverberating) an audio signal in an impulse respons
 from filter import Filter
 import librosa
 from air_absorption_bandpass import Bandpass
+from air_absorption_stft import STFT
+
 import air_absorption_calculation as aa
 import numpy as np
 import numpy.matlib
@@ -66,16 +68,13 @@ def automatic_gain_increase(data, bit_depth, ceiling):
 
     return data*factor
 
-# def generate_IR(filter):
 
-
-
-for i in range(0, len(pos_rcv)):
+def generate_IR(source, filter):
     # Prepare sound data arrays.
-    source_signal=np.copy(receiver_channels[i])
+    source_signal=np.copy(source)
 
     # Apply filter
-    filtered_signal = Filter(Bandpass()).apply(source_signal)
+    filtered_signal = Filter(filter).apply(source_signal)
 
     print(filtered_signal)
 
@@ -91,12 +90,20 @@ for i in range(0, len(pos_rcv)):
     print(impulseResponseArray)
 
     # Write impulse response file
-    filename = f'impulse_response_rcv_atten_{i}_{time.time()}.wav'
+    filename = f'impulse_response_rcv_atten_{filter.NAME}_{i}_{time.time()}.wav'
     wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
     #create_spectrogram(filename)
 
     # Visualize waveform of IR
     plt.plot(impulseResponseArray)
+
+
+    return impulseResponseArray
+
+
+for i in range(0, len(pos_rcv)):
+    bandpass_data=generate_IR(receiver_channels[i], Bandpass())
+    stft_data=generate_IR(receiver_channels[i], STFT())
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
 plt.show()

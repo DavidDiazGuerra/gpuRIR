@@ -6,11 +6,12 @@ import air_absorption_calculation as aa
 
 class Bandpass(FilterStrategy):
 
-    def __init__(self, max_frequency=20000, min_frequency=1, divisions=1, fs=44100):
+    def __init__(self, max_frequency=20000, min_frequency=1, divisions=15, fs=44100):
         self.max_frequency = max_frequency
         self.min_frequency = min_frequency
         self.divisions = divisions
         self.fs = fs
+        self.NAME="Bandpass"
 
     '''
     Calculates how much distance the sound has travelled. [m]
