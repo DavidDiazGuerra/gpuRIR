@@ -20,11 +20,11 @@ from create_spectrogram import create_spectrogram
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
 
-room_sz = [6,6,5]  # Size of the room [m]
+room_sz = [8,10,3]  # Size of the room [m]
 nb_src = 1  # Number of sources
-pos_src = np.array([[1,1,2.5]]) # Positions of the sources ([m]
+pos_src = np.array([[4,2,1.7]]) # Positions of the sources ([m]
 nb_rcv = 1 # Number of receivers
-pos_rcv = np.array([[5.9,5.9,4.9]])	 # Position of the receivers [m]
+pos_rcv = np.array([[4,8,1.7]])	 # Position of the receivers [m]
 orV_rcv = np.matlib.repmat(np.array([0,1,0]), nb_rcv, 1) # Vectors pointing in the same direction than the receivers
 mic_pattern = "card" # Receiver polar pattern
 abs_weights = [0.9]*5+[0.5] # Absortion coefficient ratios of the walls
