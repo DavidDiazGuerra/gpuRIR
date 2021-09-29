@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
 
-def create_spectrogram(inner_file_path):
+def create_spectrogram(inner_file_path, title=""):
     waveform, sample_rate = librosa.load(inner_file_path)
-    plot_spec(to_decibles(waveform), sample_rate)
+    plot_spec(to_decibles(waveform), sample_rate, title)
     plt.show()
 
 def to_decibles(signal):
@@ -21,8 +21,8 @@ def to_decibles(signal):
     return D # Return converted audio signal
 
 # Function to plot the converted audio signal
-def plot_spec(D, sr):
+def plot_spec(D, sr, title):
     fig, ax = plt.subplots(figsize = (30,10))
     spec = librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='linear', ax=ax)
-    ax.set(title = f'Sample rate: {sr}')
+    ax.set(title = f'{title}')
     fig.colorbar(spec)

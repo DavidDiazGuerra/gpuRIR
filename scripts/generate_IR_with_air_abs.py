@@ -78,8 +78,6 @@ def generate_IR(source, filter):
     # Apply filter
     filtered_signal = Filter(filter).apply(source_signal)
 
-    print(filtered_signal)
-
     # Stack array vertically
     impulseResponseArray = np.vstack(filtered_signal)
 
@@ -89,17 +87,17 @@ def generate_IR(source, filter):
     # Create stereo file (dual mono)
     impulseResponseArray = np.concatenate((impulseResponseArray, impulseResponseArray), axis=1)
 
-    print(impulseResponseArray)
-
     # Write impulse response file
     filename=f'impulse_response_rcv_atten_{filter.NAME}_{i}_{time.time()}.wav'
     create_soundfile(impulseResponseArray.astype(bit_depth), fs, filename)
     
     # Create spectrogram
-    create_spectrogram(filename)
+    create_spectrogram(filename, filter.NAME)
 
     # Visualize waveform of IR
+    plt.title(filter.NAME)
     plt.plot(impulseResponseArray)
+    plt.show()
 
     return impulseResponseArray
 
@@ -107,14 +105,19 @@ def generate_IR(source, filter):
 for i in range(0, len(pos_rcv)):
     bandpass_data=generate_IR(receiver_channels[i], Bandpass())
     stft_data=generate_IR(receiver_channels[i], STFT())
-
     # Calculate and visualize difference of two waveforms
+    '''
     difference=bandpass_data-stft_data
+        
+    print("difference:")
+    print(difference)
     plt.plot(difference)
+    plt.show()
+
     difference_filename=f'difference_{time.time()}.wav'
     create_soundfile(difference, fs, difference_filename)
     create_spectrogram(difference_filename)
+    '''
 
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
-plt.show()
