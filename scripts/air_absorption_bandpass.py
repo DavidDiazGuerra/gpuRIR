@@ -2,6 +2,7 @@ from filter import FilterStrategy
 import numpy as np
 from scipy.signal import butter, lfilter
 import air_absorption_calculation as aa
+import threading
 
 
 class Bandpass(FilterStrategy):
@@ -41,44 +42,57 @@ class Bandpass(FilterStrategy):
         y = lfilter(b, a, data)
         return y
 
+    def apply_single_band(self, IR, band_num, frequency_range, combined_signals):
+        # Upper ceiling of each band
+        band_max = ((frequency_range / self.divisions) * band_num)
+
+        # Lower ceiling of each band and handling of edge case
+        if band_num == 1:
+            band_min = self.min_frequency
+        else:
+            band_min = ((frequency_range / self.divisions) * (band_num - 1))
+
+        # Calculating mean frequency of band which determines the attenuation.
+        band_mean = (band_max+band_min)/2
+        print(f"Band {band_num} frequencies: min: {band_min} max: {band_max} mean:{band_mean}")
+
+        # Prepare + apply bandpass filter
+        filtered_signal = self.apply_bandpass_filter(
+            IR, band_min, band_max, self.fs, 3)
+
+        # Apply attenuation
+        for k in range(0, len(filtered_signal)):
+            alpha, alpha_iso, c, c_iso = aa.air_absorption(band_mean)
+            distance = self.distance_travelled(k, self.fs, c)
+            attenuation = distance*alpha  # [dB]
+
+            filtered_signal[k] *= 10**(-attenuation / 10)
+        
+        
+        # Summing the different bands together
+        for k in range(0, len(combined_signals)):
+            combined_signals[k] += filtered_signal[k]
+
+
     # max_frequency, min_frequency, divisions, fs
     def air_absorption_bandpass(self, IR):
         frequency_range = self.max_frequency - self.min_frequency
 
         combined_signals = np.zeros(len(IR))
-
+        
+        threads = []
+        
         # Divide frequency range into defined frequency bands
         for j in range(1, self.divisions + 1):
-            # Upper ceiling of each band
-            band_max = ((frequency_range / self.divisions) * j)
+            t = threading.Thread(target=self.apply_single_band, args=(IR, j, frequency_range, combined_signals, ))
+            t.start()
 
-            # Lower ceiling of each band and handling of edge case
-            if j == 1:
-                band_min = self.min_frequency
-            else:
-                band_min = ((frequency_range / self.divisions) * (j - 1))
+            threads.append(t)
 
-            # Calculating mean frequency of band which determines the attenuation.
-            band_mean = (band_max+band_min)/2
-            print(
-                f"Band {j} frequencies: min: {band_min} max: {band_max} mean:{band_mean}")
+        # join all threads
+        for t in threads:
+            t.join()
 
-            # Prepare + apply bandpass filter
-            filtered_signal = self.apply_bandpass_filter(
-                IR, band_min, band_max, self.fs, 3)
-
-            # Apply attenuation
-            for k in range(0, len(filtered_signal)):
-                alpha, alpha_iso, c, c_iso = aa.air_absorption(band_mean)
-                distance = self.distance_travelled(k, self.fs, c)
-                attenuation = distance*alpha  # [dB]
-
-                filtered_signal[k] *= 10**(-attenuation / 10)
-
-            # Summing the different bands together
-            for k in range(0, len(combined_signals)):
-                combined_signals[k] += filtered_signal[k]
-        
         return combined_signals
 
     def apply(self, IR):

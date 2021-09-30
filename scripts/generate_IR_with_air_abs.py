@@ -15,6 +15,7 @@ from math import ceil
 from scipy.io import wavfile
 import time
 import gpuRIR
+import timeit
 from create_spectrogram import create_spectrogram
 
 gpuRIR.activateMixedPrecision(False)
@@ -103,8 +104,16 @@ def generate_IR(source, filter):
 
 
 for i in range(0, len(pos_rcv)):
+    start_band = timeit.timeit()
     bandpass_data=generate_IR(receiver_channels[i], Bandpass())
+    end_band = timeit.timeit()
+    
+    start_stft = timeit.timeit()
     stft_data=generate_IR(receiver_channels[i], STFT())
+    start_stft = timeit.timeit()
+
+    print(f'Bandpass filter took: {end_band-start_band}')
+    print(f'STFT filter took: {end_band-start_band}')
     # Calculate and visualize difference of two waveforms
     '''
     difference=bandpass_data-stft_data
