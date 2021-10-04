@@ -5,7 +5,6 @@ import air_absorption_calculation as aa
 import multiprocessing
 from multiprocessing import Pool
 
-
 class Bandpass(FilterStrategy):
     def __init__(self, max_frequency=20000, min_frequency=1, divisions=50, fs=44100):
         self.max_frequency = max_frequency
