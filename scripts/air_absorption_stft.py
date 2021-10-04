@@ -22,7 +22,7 @@ class STFT(FilterStrategy):
                             nfft=self.nFFT, boundary='even', padded=True, return_onesided=False)
 
         # Get air absorption coeffs for given configuration, coeffs are in dB/meter
-        alphas_t0, alpha_iso, c, c_iso = aa.air_absorption(f, self.T, self.hr, self.ps)
+        alphas_t0, _, c, _ = aa.air_absorption(f, self.T, self.hr, self.ps)
 
         # Get air absorption coeffs over distance/time for each band
         alphas = np.zeros((len(f), len(t)))

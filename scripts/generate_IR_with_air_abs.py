@@ -42,13 +42,6 @@ RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdi
 
 receiver_channels = RIRs[0] # Extract receiver channels (mono) from RIRs.
 
-'''
-Parameters relating to air absorption
-enable_air_absorption=True # Determines if air absorption is applied.
-divisions=1 # How many partitions the frequency spectrum gets divided into. Roughly correlates to quality / accuracy.
-min_frequency=20.0 # [Hz] Lower frequency boundary.
-max_frequency=20000.0 # [Hz] Upper frequency boundary.
-'''
 
 '''
 Increases amplitude (loudness) to defined ceiling.
@@ -106,20 +99,6 @@ def generate_IR(source, filter):
 for i in range(0, len(pos_rcv)):
     bandpass_data=generate_IR(receiver_channels[i], Bandpass())
     stft_data=generate_IR(receiver_channels[i], STFT())
-
-    # Calculate and visualize difference of two waveforms
-    '''
-    difference=bandpass_data-stft_data
-        
-    print("difference:")
-    print(difference)
-    plt.plot(difference)
-    plt.show()
-
-    difference_filename=f'difference_{time.time()}.wav'
-    create_soundfile(difference, fs, difference_filename)
-    create_spectrogram(difference_filename)
-    '''
 
 
 t = np.arange(int(ceil(Tmax * fs))) / fs

@@ -1,6 +1,6 @@
 from filter import FilterStrategy
 import numpy as np
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, lfilter, filtfilt
 import air_absorption_calculation as aa
 import multiprocessing
 from multiprocessing import Pool
@@ -39,7 +39,8 @@ class Bandpass(FilterStrategy):
     @staticmethod
     def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
         b, a = Bandpass.create_bandpass_filter(lowcut, highcut, fs, order=order)
-        y = lfilter(b, a, data)
+        y = lfilter(b, a, data)     # Single Filter
+        #y = filtfilt(b, a, data)   # Forward and backward filtering
         return y
 
     def apply_single_band(self, IR, band_num, frequency_range):
