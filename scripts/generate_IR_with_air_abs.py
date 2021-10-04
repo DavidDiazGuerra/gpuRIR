@@ -42,8 +42,6 @@ RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdi
 
 receiver_channels = RIRs[0] # Extract receiver channels (mono) from RIRs.
 
-
-
 '''
 Parameters relating to air absorption
 enable_air_absorption=True # Determines if air absorption is applied.
@@ -76,7 +74,10 @@ def generate_IR(source, filter):
     source_signal=np.copy(source)
 
     # Apply filter
+    start_time=time.time()
     filtered_signal = Filter(filter).apply(source_signal)
+    end_time=time.time()
+    print(f"{filter.NAME} time = {end_time-start_time} seconds")
 
     # Stack array vertically
     impulseResponseArray = np.vstack(filtered_signal)
@@ -105,6 +106,7 @@ def generate_IR(source, filter):
 for i in range(0, len(pos_rcv)):
     bandpass_data=generate_IR(receiver_channels[i], Bandpass())
     stft_data=generate_IR(receiver_channels[i], STFT())
+
     # Calculate and visualize difference of two waveforms
     '''
     difference=bandpass_data-stft_data
