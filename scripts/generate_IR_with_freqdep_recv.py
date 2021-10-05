@@ -128,7 +128,5 @@ def generate_IR(source, filter):
 
 
 for i in range(0, len(pos_rcv)):
-    linear_filter = LinearFilter(sm57_freq_response, receiver_channels[i], fs, False)
+    linear_filter = LinearFilter(sm57_freq_response, fs, False)
     rcv_filter = generate_IR(receiver_channels[i], linear_filter)
-
-t = np.arange(int(ceil(Tmax * fs))) / fs

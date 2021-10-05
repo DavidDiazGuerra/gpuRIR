@@ -1,13 +1,13 @@
 from filters.filter import FilterStrategy
+
 import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
 
 class LinearFilter(FilterStrategy):
     
-    def __init__(self, freq_response, source_signal, fs, plot):
+    def __init__(self, freq_response, fs, plot):
         self.freq_response = freq_response
-        self.source_signal = source_signal
         self.fs = fs
         self.plot=plot
         self.NAME = "Linear"
@@ -21,9 +21,7 @@ class LinearFilter(FilterStrategy):
     '''
     def apply_linear_filter(self, data):
         relative_response = self.freq_response[:, 1]
-        print(relative_response)
         bands = self.freq_response[:, 0]  # band frequencies in Hz
-        print(bands)
 
         for i in range(len(relative_response)):
             relative_response[i] = self.rel_db_response_to_ratio(relative_response[i])
