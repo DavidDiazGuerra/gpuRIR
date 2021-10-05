@@ -15,14 +15,37 @@ def rel_db_response_to_ratio(gain_dB):
 
 if __name__ == '__main__':
     y, fs = soundfile.read('clean_woman.wav')
-
+    
     # Simulate mic response using a band-pass FIR filter
     # in real worls b_siumulated_mic would be measured with real microphones and loudspeakers
     # choose which bands should be filtered
-    relative_response = [
-        -10, -4, 0, -1, -0.1, 0, 0.05, 0.1, 2, 5, 6.5, 3, 2.5, 4, 3.5, -10]
-    bands = [
-        50, 100, 200, 400, 700, 1000, 1500, 2000, 3000, 5000, 6000, 7000, 8000, 9000, 10000, fs/2]  # band frequencies in Hz
+
+    #Shure SM57 dynamic microphone. Standard mic for US presidential speeches
+    sm57_freq_response=np.array([ 
+        # Frequency in Hz | Relative response in dB
+        [50, -10],
+        [100, -4],
+        [200, 0],
+        [400, -1],
+        [700, -0.1],
+        [1000, 0],
+        [1500, 0.05],
+        [2000, 0.1],
+        [3000, 2],
+        [4000, 3],
+        [5000, 5],
+        #[6000, 6.5],
+        [7000, 3],
+        [8000, 2.5],
+        [9000, 4],
+        [10000, 3.5],
+        [fs/2, -10]
+    ])
+
+    relative_response = sm57_freq_response[:,1]
+    print(relative_response)
+    bands = sm57_freq_response[:,0]  # band frequencies in Hz
+    print(bands)
 
     for i in range(len(relative_response)):
         relative_response[i] = rel_db_response_to_ratio(relative_response[i])

@@ -50,14 +50,27 @@ RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img,
 
 receiver_channels = RIRs[0]  # Extract receiver channels (mono) from RIRs.
 
-sm57_freqs = np.array(
-    [50, 500, 900, 1000, 1100]
-)
-sm57_relative_response = np.array(
-    [0.1, 0, -10, -20, -40]
-)
-
-plt.plot(sm57_freqs, sm57_relative_response)
+#Shure SM57 dynamic microphone. Standard mic for US presidential speeches
+sm57_freq_response = np.array([
+        # Frequency in Hz | Relative response in dB
+        [50, -10],
+        [100, -4],
+        [200, 0],
+        [400, -1],
+        [700, -0.1],
+        [1000, 0],
+        [1500, 0.05],
+        [2000, 0.1],
+        [3000, 2],
+        [4000, 3],
+        [5000, 5],
+        #[6000, 6.5],
+        [7000, 3],
+        [8000, 2.5],
+        [9000, 4],
+        [10000, 3.5],
+        [fs/2, -10]
+    ])
 
 '''
 Increases amplitude (loudness) to defined ceiling.
@@ -117,8 +130,7 @@ def generate_IR(source, filter):
 
 
 for i in range(0, len(pos_rcv)):
-    linear_filter = LinearFilter(
-        sm57_freqs, sm57_relative_response, receiver_channels[i])
+    linear_filter = LinearFilter(sm57_freq_response, receiver_channels[i], fs, False)
     rcv_filter = generate_IR(receiver_channels[i], linear_filter)
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
