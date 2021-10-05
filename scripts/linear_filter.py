@@ -10,7 +10,7 @@ class LinearFilter(FilterStrategy):
 
     
     '''
-    Applies a butterworth bandpass filter.
+    Applies a linear filter.
     '''
     @staticmethod
     def apply_linear_filter(data, a, b):
