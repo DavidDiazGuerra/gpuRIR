@@ -2,13 +2,14 @@
 Generates an impulse response WAV file (IR).
 Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
 """
-from filter import Filter
+from filters.filter import Filter
+from filters.air_absorption_bandpass import Bandpass
+from filters.air_absorption_stft import STFT
+import filters.air_absorption_calculation as aa
+
+from create_spectrogram import create_spectrogram
 
 import librosa
-
-from air_absorption_bandpass import Bandpass
-from air_absorption_stft import STFT
-import air_absorption_calculation as aa
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -16,7 +17,6 @@ from math import ceil
 from scipy.io import wavfile
 import time
 import gpuRIR
-from create_spectrogram import create_spectrogram
 
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)

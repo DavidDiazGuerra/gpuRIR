@@ -1,7 +1,8 @@
-from filter import FilterStrategy
+from filters.filter import FilterStrategy
+import filters.air_absorption_calculation as aa
+
 import numpy as np
 from scipy.signal import butter, lfilter
-import air_absorption_calculation as aa
 import multiprocessing
 from multiprocessing import Pool
 

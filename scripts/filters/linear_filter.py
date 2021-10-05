@@ -1,4 +1,4 @@
-from filter import FilterStrategy
+from filters.filter import FilterStrategy
 import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
