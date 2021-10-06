@@ -4,7 +4,8 @@ Example usage: Convolving (reverberating) an audio signal in an impulse respons
 """
 from filters.filter import Filter
 import librosa
-from filters.linear_filter import LinearFilter
+#from filters.linear_filter import LinearFilter
+from filters.characteristic_filter import CharacteristicFilter
 import filters.air_absorption_calculation as aa
 import numpy as np
 import numpy.matlib
@@ -48,27 +49,77 @@ RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img,
 
 receiver_channels = RIRs[0]  # Extract receiver channels (mono) from RIRs.
 
-#Shure SM57 dynamic microphone. Standard mic for US presidential speeches
+'''
+Microphone models
+'''
+
+# Shure SM57 dynamic microphone. Standard mic for US presidential speeches
 sm57_freq_response = np.array([
-        # Frequency in Hz | Relative response in dB
-        [50, -10],
-        [100, -4],
-        [200, 0],
-        [400, -1],
-        [700, -0.1],
-        [1000, 0],
-        [1500, 0.05],
-        [2000, 0.1],
-        [3000, 2],
-        [4000, 3],
-        [5000, 5],
-        #[6000, 6.5],
-        [7000, 3],
-        [8000, 2.5],
-        [9000, 4],
-        [10000, 3.5],
-        [fs/2, -10]
-    ])
+    # Frequency in Hz | Relative response in dB
+    [50, -10],
+    [100, -4],
+    [200, 0],
+    [400, -1],
+    [700, -0.1],
+    [1000, 0],
+    [1500, 0.05],
+    [2000, 0.1],
+    [3000, 2],
+    [4000, 3],
+    [5000, 5],
+    [6000, 6.5],
+    [7000, 3],
+    [8000, 2.5],
+    [9000, 4],
+    [10000, 3.5],
+    [12000, 1],
+    [14000, 2],
+    [15000, -5]
+])
+
+# iPhone X.
+iphone_x_freq_response=np.array([
+    [30, -12],
+    [40, -3],
+    [50, 0],
+    [70, 1],
+    [100, 2],
+    [150, 3],
+    [170, 2],
+    [200, 1.5],
+    [250, 1.5],
+    [300, 3],
+    [400, 2.5],
+    [500, 2],
+    [600, 2],
+    [1000, 2.5],
+    [1500, 3],
+    [2000, 3],
+    [2500, 4],
+    [3000, 4],
+    [4000, 3],
+    [5000, 3.5],
+    [6000, 3.8],
+    [7000, 4],
+    [8000, 4.5],
+    [9000, 4.75],
+    [10000, 5],
+    [12500, 1],
+    [15000, -5],
+    [17000, -7],
+    [20000, -8]
+
+])
+
+demo_freq = np.array([
+    [50, -10],
+    [100, -4],
+    [200, 0],
+    [400, -1],
+    [700, -0.1],
+    [1000, -10],
+])
+
 
 '''
 Increases amplitude (loudness) to defined ceiling.
@@ -128,5 +179,5 @@ def generate_IR(source, filter):
 
 
 for i in range(0, len(pos_rcv)):
-    linear_filter = LinearFilter(sm57_freq_response, fs, False)
-    rcv_filter = generate_IR(receiver_channels[i], linear_filter)
+    characteristic_filter = CharacteristicFilter(iphone_x_freq_response, fs, plot=True)
+    rcv_filter = generate_IR(receiver_channels[i], characteristic_filter)

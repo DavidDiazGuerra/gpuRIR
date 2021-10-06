@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class LinearFilter(FilterStrategy):
     
-    def __init__(self, freq_response, fs, plot):
+    def __init__(self, freq_response, fs, plot=False):
         self.freq_response = freq_response
         self.fs = fs
         self.plot=plot
