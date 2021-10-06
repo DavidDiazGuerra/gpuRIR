@@ -136,5 +136,5 @@ def generate_IR(source, filter=None, apply_filter=False):
 
 
 for i in range(0, len(pos_rcv)):
-    characteristic_filter = CharacteristicFilter(iphone_x_freq_response, fs, plot=True)
+    characteristic_filter = CharacteristicFilter(tiny_speaker, fs, plot=True)
     rcv_filter = generate_IR(filtered_signal, characteristic_filter, apply_filter=False)
