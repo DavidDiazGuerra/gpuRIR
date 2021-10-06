@@ -37,7 +37,8 @@ class STFT(FilterStrategy):
         RIR_TF_processed = RIR_TF*np.power(10, (alphas/20))
 
         # Transform processed STFT of RIR back to time domain
-        _, RIR_processed = istft(RIR_TF_processed, self.fs, self.window, nperseg=self.nFFT, noverlap=self.noverlap, nfft=self.nFFT)
+        _, RIR_processed = istft(RIR_TF_processed, self.fs, self.window,
+                                 nperseg=self.nFFT, noverlap=self.noverlap, nfft=self.nFFT)
         RIR_processed = RIR_processed[0:len(RIR)]
         return RIR_processed
 

@@ -30,7 +30,6 @@ Tdiff= gpuRIR.att2t_SabineEstimator(att_diff, T60) # Time to start the diffuse r
 Tmax = gpuRIR.att2t_SabineEstimator(att_max, T60)	 # Time to stop the simulation [s]
 nb_img = gpuRIR.t2n( Tdiff, room_sz )	# Number of image sources in each dimension
 RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_traj, pos_rcv, nb_img, Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern)
-
 filtered_signal = gpuRIR.simulateTrajectory(source_signal, RIRs)
 wavfile.write('filtered_signal.wav', fs, filtered_signal)
 plt.plot(filtered_signal)

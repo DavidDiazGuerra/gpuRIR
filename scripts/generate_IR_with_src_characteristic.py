@@ -15,6 +15,23 @@ from scipy.io import wavfile
 import time
 import gpuRIR
 from create_spectrogram import create_spectrogram
+from generate_white_noise import generate_white_noise
+
+'''
+Speaker models
+'''
+# Tiny speaker, comparable to smartphone speaker
+tiny_speaker = np.array([
+    [200, -10],
+    [300, -2],
+    [1000, 0],
+    [5000, 3],
+    [7000, 5],
+    [10000, -2],
+    [12000, -5],
+    [14000, -10]
+])
+
 
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
@@ -47,74 +64,22 @@ nb_img = gpuRIR.t2n(Tdiff, room_sz)
 RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img,
                           Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern)
 
-receiver_channels = RIRs[0]  # Extract receiver channels (mono) from RIRs.
 
-'''
-Microphone models
-'''
+# Generate source white noise
+white_noise = generate_white_noise(Tdiff, Tmax, fs, 1, 1)
 
-# Shure SM57 dynamic microphone. Standard mic for US presidential speeches
-sm57_freq_response = np.array([
-    # Frequency in Hz | Relative response in dB
-    [50, -10],
-    [100, -4],
-    [200, 0],
-    [400, -1],
-    [700, -0.1],
-    [1000, 0],
-    [1500, 0.05],
-    [2000, 0.1],
-    [3000, 2],
-    [4000, 3],
-    [5000, 5],
-    [6000, 6.5],
-    [7000, 3],
-    [8000, 2.5],
-    [9000, 4],
-    [10000, 3.5],
-    [12000, 1],
-    [14000, 2],
-    [15000, -5]
-])
+# Apply characteristic to source signal
+speaker_filter = CharacteristicFilter(tiny_speaker, fs, plot=True)
+filtered_white_noise = Filter(speaker_filter).apply(white_noise)
 
-# iPhone X.
-iphone_x_freq_response=np.array([
-    [30, -12],
-    [40, -3],
-    [50, 0],
-    [70, 1],
-    [100, 2],
-    [150, 3],
-    [170, 2],
-    [200, 1.5],
-    [250, 1.5],
-    [300, 3],
-    [400, 2.5],
-    [500, 2],
-    [600, 2],
-    [1000, 2.5],
-    [1500, 3],
-    [2000, 3],
-    [2500, 4],
-    [3000, 4],
-    [4000, 3],
-    [5000, 3.5],
-    [6000, 3.8],
-    [7000, 4],
-    [8000, 4.5],
-    [9000, 4.75],
-    [10000, 5],
-    [12500, 1],
-    [15000, -5],
-    [17000, -7],
-    [20000, -8]
-
-])
-
+# Send filtered white noise through gpuRIR
+filtered_signal=gpuRIR.simulateTrajectory(filtered_white_noise, RIRs, fs=fs)
 
 '''
 Increases amplitude (loudness) to defined ceiling.
 '''
+
+
 def automatic_gain_increase(data, bit_depth, ceiling):
     peak = np.max(data)
     negative_peak = np.abs(np.min(data))
@@ -133,26 +98,27 @@ def create_soundfile(data, fs, filename):
     wavfile.write(filename, fs, data)
 
 
-def generate_IR(source, filter):
+def generate_IR(source, filter=None, apply_filter=False):
     # Prepare sound data arrays.
     source_signal = np.copy(source)
 
     # Apply filter
-    start_time = time.time()
-    filtered_signal = Filter(filter).apply(source_signal)
-    end_time = time.time()
-    print(f"{filter.NAME} time = {end_time-start_time} seconds")
+    if apply_filter:
+        start_time = time.time()
+        filtered_signal = Filter(filter).apply(source_signal)
+        end_time = time.time()
+        print(f"{filter.NAME} time = {end_time-start_time} seconds")
+    else:
+        filtered_signal=source_signal
 
     # Stack array vertically
     impulseResponseArray = np.vstack(filtered_signal)
 
     # Increase Amplitude to usable levels
-    impulseResponseArray = automatic_gain_increase(
-        impulseResponseArray, bit_depth, 3)
+    impulseResponseArray = automatic_gain_increase(impulseResponseArray, bit_depth, 3)
 
     # Create stereo file (dual mono)
-    impulseResponseArray = np.concatenate(
-        (impulseResponseArray, impulseResponseArray), axis=1)
+    impulseResponseArray = np.concatenate((impulseResponseArray, impulseResponseArray), axis=1)
 
     # Write impulse response file
     filename = f'impulse_response_rcv_{filter.NAME}_char_{i}_{time.time()}.wav'
@@ -171,4 +137,4 @@ def generate_IR(source, filter):
 
 for i in range(0, len(pos_rcv)):
     characteristic_filter = CharacteristicFilter(iphone_x_freq_response, fs, plot=True)
-    rcv_filter = generate_IR(receiver_channels[i], characteristic_filter)
+    rcv_filter = generate_IR(filtered_signal, characteristic_filter, apply_filter=False)
