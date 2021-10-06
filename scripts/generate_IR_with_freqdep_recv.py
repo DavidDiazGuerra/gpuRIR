@@ -111,15 +111,6 @@ iphone_x_freq_response=np.array([
 
 ])
 
-demo_freq = np.array([
-    [50, -10],
-    [100, -4],
-    [200, 0],
-    [400, -1],
-    [700, -0.1],
-    [1000, -10],
-])
-
 
 '''
 Increases amplitude (loudness) to defined ceiling.
@@ -164,7 +155,7 @@ def generate_IR(source, filter):
         (impulseResponseArray, impulseResponseArray), axis=1)
 
     # Write impulse response file
-    filename = f'impulse_response_rcv_atten_{filter.NAME}_{i}_{time.time()}.wav'
+    filename = f'impulse_response_rcv_{filter.NAME}_char_{i}_{time.time()}.wav'
     create_soundfile(impulseResponseArray.astype(bit_depth), fs, filename)
 
     # Create spectrogram
