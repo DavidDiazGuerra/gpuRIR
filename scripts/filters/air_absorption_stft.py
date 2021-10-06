@@ -1,7 +1,8 @@
-import numpy as np
 from scipy.signal import istft, stft
-import air_absorption_calculation as aa
-from filter import FilterStrategy
+from filters.filter import FilterStrategy
+import filters.air_absorption_calculation as aa
+
+import numpy as np
 
 
 class STFT(FilterStrategy):

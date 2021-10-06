@@ -2,12 +2,13 @@
 Generates an impulse response WAV file (IR).
 Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
 """
-from filter import Filter
-import librosa
-from air_absorption_bandpass import Bandpass
-from air_absorption_stft import STFT
+from filters.filter import Filter
+from filters.air_absorption_bandpass import Bandpass
+from filters.air_absorption_stft import STFT
 
-import air_absorption_calculation as aa
+from create_spectrogram import create_spectrogram
+
+import librosa
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -15,7 +16,6 @@ from math import ceil
 from scipy.io import wavfile
 import time
 import gpuRIR
-from create_spectrogram import create_spectrogram
 
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
@@ -41,7 +41,6 @@ nb_img = gpuRIR.t2n( Tdiff, room_sz )	# Number of image sources in each dimensio
 RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern)
 
 receiver_channels = RIRs[0] # Extract receiver channels (mono) from RIRs.
-
 
 '''
 Increases amplitude (loudness) to defined ceiling.
@@ -99,6 +98,3 @@ def generate_IR(source, filter):
 for i in range(0, len(pos_rcv)):
     bandpass_data=generate_IR(receiver_channels[i], Bandpass())
     stft_data=generate_IR(receiver_channels[i], STFT())
-
-
-t = np.arange(int(ceil(Tmax * fs))) / fs

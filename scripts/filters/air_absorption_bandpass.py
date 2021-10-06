@@ -1,10 +1,10 @@
-from filter import FilterStrategy
+from filters.filter import FilterStrategy
+from filters.air_absorption_calculation import air_absorption
+
 import numpy as np
 from scipy.signal import butter, lfilter, filtfilt
-import air_absorption_calculation as aa
 import multiprocessing
 from multiprocessing import Pool
-
 
 class Bandpass(FilterStrategy):
     def __init__(self, max_frequency=20000, min_frequency=1, divisions=50, fs=44100):
@@ -63,7 +63,7 @@ class Bandpass(FilterStrategy):
             IR, band_min, band_max, self.fs, 3)
 
         # Calculate air absorption coefficients
-        alpha, _, c, _ = aa.air_absorption(band_mean)
+        alpha, _, c, _ = air_absorption(band_mean)
 
         # Apply attenuation
         for k in range(0, len(filtered_signal)):
