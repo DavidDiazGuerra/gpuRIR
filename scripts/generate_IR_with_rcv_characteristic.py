@@ -160,14 +160,14 @@ def generate_IR(source, filter):
     # Create spectrogram
     create_spectrogram(filename, filter.NAME)
 
-    # Visualize waveform of IR
-    plt.title(filter.NAME)
-    plt.plot(impulseResponseArray)
-    plt.show()
-
     return impulseResponseArray
 
 
 for i in range(0, len(pos_rcv)):
+       
+    # Apply air abs
     characteristic_filter = CharacteristicFilter(iphone_x_freq_response, fs, plot=True)
     rcv_filter = generate_IR(receiver_channels[i], characteristic_filter)
+
+    # Apply source char..
+

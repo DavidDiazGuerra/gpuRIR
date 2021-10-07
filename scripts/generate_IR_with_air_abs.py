@@ -87,11 +87,6 @@ def generate_IR(source, filter):
     # Create spectrogram
     create_spectrogram(filename, filter.NAME)
 
-    # Visualize waveform of IR
-    plt.title(filter.NAME)
-    plt.plot(impulseResponseArray)
-    plt.show()
-
     return impulseResponseArray
 
 
