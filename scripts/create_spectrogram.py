@@ -1,6 +1,6 @@
 
-import librosa
-import librosa.display
+#import librosa
+#import librosa.display
 import sys
 import numpy as np
 import matplotlib.pyplot as plot
@@ -21,9 +21,10 @@ def create_spectrogram(inner_file_path, title=""):
 
     #plot.subplot(212)
     plot.title(title)
-    plot.specgram(signalData,Fs=samplingFrequency, cmap='inferno')
+    _, _, _, cax = plot.specgram(signalData,Fs=samplingFrequency, cmap='inferno')
     plot.xlabel('Zeit [s]')
     plot.ylabel('Frequenz [Hz]')
+    plot.colorbar(cax, label='dB').ax.yaxis.set_label_position('left')
     plot.show()
 
 if len(sys.argv) > 1:
