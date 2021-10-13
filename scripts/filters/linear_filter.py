@@ -6,27 +6,19 @@ import matplotlib.pyplot as plt
 
 class LinearFilter(FilterStrategy):
     
-    def __init__(self, freq_response, fs, plot=False):
-        self.freq_response = freq_response
+    def __init__(self, numtabs, bands, desired, fs, plot=False):
+        self.numtabs=numtabs
+        self.bands = bands
+        self.desired = desired
         self.fs = fs
         self.plot=plot
-        self.NAME = "Linear"
-
-    @staticmethod
-    def rel_db_response_to_ratio(gain_dB):
-        return 10**(gain_dB/10)
+        self.NAME = "linear"
 
     '''
     Applies a linear filter.
     '''
     def apply_linear_filter(self, data):
-        relative_response = self.freq_response[:, 1]
-        bands = self.freq_response[:, 0]  # band frequencies in Hz
-
-        for i in range(len(relative_response)):
-            relative_response[i] = self.rel_db_response_to_ratio(relative_response[i])
-
-        b_siumulated_mic = scipy.signal.firls(51, bands, relative_response, fs=self.fs)  # design filter
+        b_siumulated_mic = scipy.signal.firls(self.numtabs, self.bands, self.desired, fs=self.fs)  # design filter
 
         if self.plot:
             # Plot frequency resonse of filter

@@ -21,7 +21,7 @@ class CharacteristicFilter(FilterStrategy):
         self.window = window
         self.freq_response = freq_response
         self.plot = plot
-        self.NAME = "STFT"
+        self.NAME = "STFT_characteristic"
 
     '''
     Interpolates frequency response array with cubic spline method.

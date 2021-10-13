@@ -6,13 +6,13 @@ from scipy.signal import butter, lfilter, filtfilt
 import multiprocessing
 from multiprocessing import Pool
 
-class Bandpass(FilterStrategy):
+class AirAbsBandpass(FilterStrategy):
     def __init__(self, max_frequency=20000, min_frequency=1, divisions=50, fs=44100):
         self.max_frequency = max_frequency
         self.min_frequency = min_frequency
         self.divisions = divisions
         self.fs = fs
-        self.NAME = "Bandpass"
+        self.NAME = "bandpass_air_abs"
 
     '''
     Calculates how much distance the sound has travelled. [m]
@@ -38,7 +38,7 @@ class Bandpass(FilterStrategy):
     '''
     @staticmethod
     def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
-        b, a = Bandpass.create_bandpass_filter(lowcut, highcut, fs, order=order)
+        b, a = AirAbsBandpass.create_bandpass_filter(lowcut, highcut, fs, order=order)
         y = lfilter(b, a, data)     # Single Filter
         #y = filtfilt(b, a, data)   # Forward and backward filtering
         return y

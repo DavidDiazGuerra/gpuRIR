@@ -5,7 +5,7 @@ import filters.air_absorption_calculation as aa
 import numpy as np
 
 
-class STFT(FilterStrategy):
+class AirAbsSTFT(FilterStrategy):
     def __init__(self, T=25, hr=50, ps=1, fs=44100, nFFT=256, noverlap=int(256*0.75), window='hanning'):
         self.T = T
         self.hr = hr
@@ -14,7 +14,7 @@ class STFT(FilterStrategy):
         self.nFFT = nFFT
         self.noverlap = noverlap
         self.window = window
-        self.NAME = "STFT"
+        self.NAME = "STFT_air_abs"
 
     def STFT_air_absorption(self, RIR):
 
