@@ -134,10 +134,12 @@ if __name__ == "__main__":
         # Leave filters array empty if no filters should be applied.
         filters = [
             # Speaker simulation
-            LinearFilter(101, (0, 100, 150, 7000, 7001, fs/2), (0, 0, 1, 1, 0, 0), fs),
+            #LinearFilter(101, (0, 100, 150, 7000, 7001, fs/2), (0, 0, 1, 1, 0, 0), fs),
+            
             # Air absorption simulation
-            AirAbsBandpass(),
+            #AirAbsBandpass(),
+
             # Mic simulation
-            CharacteristicFilter(cm.sm57_freq_response, fs),
+            #CharacteristicFilter(cm.sm57_freq_response, fs),
         ]
         generate_IR(receiver_channels[i], filters, bit_depth)
