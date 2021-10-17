@@ -311,7 +311,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		}
 	}
 
-	// TODO copy orV_src to shared memorino, WAAOOOW!
+	// TODO copy orV_src to shared memory
 	
 	// Wait until the copies are completed
 	__syncthreads();
@@ -345,7 +345,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 					dist += vec[d] * vec[d]; // euclidean distance
 					
 					// for speaker directivity: computing the vector going from the image src to rcv
-					orig_src_pos_adj[d] = (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d]; // i heckin' love hidden if clauserinos
+					orig_src_pos_adj[d] = (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d]; 
 					orig_src_pos_adj[d]+=orV_src[m_src];
 					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin) (green dashed line)
 
