@@ -253,7 +253,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 	
 	extern __shared__ float sdata[];
 
-	float orV_src[3] = {1,0,0}; // TODO: convert hard coded orientation to parameter
+	float orV_src[3] = {1, .5 , .1}; // TODO: convert hard coded orientation to parameter
 	
 	int n[3];
 	n[0] = blockIdx.x * blockDim.x + threadIdx.x;
@@ -337,23 +337,21 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 			for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
 				float vec[3]; // Vector going from rcv to img src
 				float im_src_to_rcv[3]; // for speaker directivity: Vector going from img src to rcv
-				float orig_src_pos_adj[3]; // for speaker directivity: adjusted source position
 				float dist = 0;
 				for (int d=0; d<3; d++) {
 					// computing the vector going from the rcv to img src
 					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d]; 
 					dist += vec[d] * vec[d]; // euclidean distance
 					
-					// for speaker directivity: computing the vector going from the image src to rcv
-					orig_src_pos_adj[d] = (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d]; 
-					orig_src_pos_adj[d]+=orV_src[m_src];
+					// for speaker directivity
+					orV_src[d] = (1-2*rflx_idx[d]) * orV_src[d]; 
 					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin) (green dashed line)
 
 				}
 				dist = sqrtf(dist); // euclidean distance
 				float amp = rflx_att / (4*PI*dist);
 				amp *= mic_directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern);
-				amp *= mic_directivity(im_src_to_rcv, orig_src_pos_adj, mic_pattern); 
+				amp *= mic_directivity(im_src_to_rcv, orV_src, mic_pattern); 
 
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
