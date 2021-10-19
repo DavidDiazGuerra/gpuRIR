@@ -1,31 +1,23 @@
-
-#import librosa
-#import librosa.display
 import sys
 import numpy as np
-import matplotlib.pyplot as plot
+import matplotlib.pyplot as plt
 from scipy.io import wavfile
-
+from scipy import signal
 
 
 def create_spectrogram(inner_file_path, title=""):
-    samplingFrequency, signalData = wavfile.read(inner_file_path)
-    signalData=signalData[:,0]
+    fs, x = wavfile.read(inner_file_path)
+    x = x[:, 0]
+    plt.rcParams.update({'font.size': 14})
 
-    #plot.subplot(211)
-    plot.title(title)
-    plot.plot(signalData)
-    plot.xlabel('Sample')
-    plot.ylabel('Amplitude')
-    plot.show()
+    f, t, Sxx = signal.spectrogram(x, fs, nfft=512)
+    plt.pcolormesh(t, f, 10*np.log10(Sxx/Sxx.max()),
+                   vmin=-100, vmax=0, cmap='inferno')
+    plt.ylabel('Frequenz [Hz]')
+    plt.xlabel('Zeit [s]')
+    plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
+    plt.show()
 
-    #plot.subplot(212)
-    plot.title(title)
-    _, _, _, cax = plot.specgram(signalData,Fs=samplingFrequency, cmap='inferno')
-    plot.xlabel('Zeit [s]')
-    plot.ylabel('Frequenz [Hz]')
-    plot.colorbar(cax, label='dB').ax.yaxis.set_label_position('left')
-    plot.show()
 
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
