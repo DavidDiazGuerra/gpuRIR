@@ -11,8 +11,14 @@ from scipy.io import wavfile
 def create_spectrogram(inner_file_path, title=""):
     samplingFrequency, signalData = wavfile.read(inner_file_path)
     signalData=signalData[:,0]
+    # normalize data
+    signalData = signalData * (1 / np.max(signalData))
+
+    dbCap = 150
+    vmin = 20*np.log10(np.max(signalData)) - dbCap
 
     #plot.subplot(211)
+    plot.rc('font', size=12)
     plot.title(title)
     plot.plot(signalData)
     plot.xlabel('Sample')
@@ -21,7 +27,7 @@ def create_spectrogram(inner_file_path, title=""):
 
     #plot.subplot(212)
     plot.title(title)
-    _, _, _, cax = plot.specgram(signalData,Fs=samplingFrequency, cmap='inferno')
+    _, _, _, cax = plot.specgram(signalData,Fs=samplingFrequency, vmin=vmin, cmap='inferno')
     plot.xlabel('Zeit [s]')
     plot.ylabel('Frequenz [Hz]')
     plot.colorbar(cax, label='dB').ax.yaxis.set_label_position('left')
@@ -29,4 +35,7 @@ def create_spectrogram(inner_file_path, title=""):
 
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
-    create_spectrogram(file_path, file_path)
+    if len(sys.argv) > 2:
+        create_spectrogram(file_path, sys.argv[2])
+    else:
+        create_spectrogram(file_path, file_path)
