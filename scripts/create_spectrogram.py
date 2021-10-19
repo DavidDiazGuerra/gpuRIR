@@ -21,4 +21,7 @@ def create_spectrogram(inner_file_path, title=""):
 
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
-    create_spectrogram(file_path, file_path)
+    if len(sys.argv) > 2:
+        create_spectrogram(file_path, sys.argv[2])
+    else:
+        create_spectrogram(file_path, file_path)
