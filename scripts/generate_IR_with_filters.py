@@ -31,10 +31,10 @@ def generate_RIR():
     gpuRIR.activateLUT(False)
 
     room_sz = [8, 10, 3]  # Size of the room [m]
-    nb_src = 1  # Number of sources
-    pos_src = np.array([[4, 2, 1.7]])  # Positions of the sources ([m]
-    nb_rcv = 1  # Number of receivers
-    pos_rcv = np.array([[4, 8, 1.7]])	 # Position of the receivers [m]
+    nb_src = 2  # Number of sources
+    pos_src = np.array([[4, 2, 1.7],[2, 4, 1.7]])  # Positions of the sources ([m]
+    nb_rcv = 2  # Number of receivers
+    pos_rcv = np.array([[4, 8, 1.7], [2, 5, 1.7]])	 # Position of the receivers [m]
     # Vectors pointing in the same direction than the receivers
     orV_src = np.matlib.repmat(np.array([0, -1, 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), nb_rcv, 1)

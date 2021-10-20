@@ -150,8 +150,7 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, s
 	the GPU memory and crash the kernel.
 
 	'''
-	orV_src=orV_rcv
-
+	
 	assert not ((pos_src >= room_sz).any() or (pos_src <= 0).any()), "The sources must be inside the room"
 	assert not ((pos_rcv >= room_sz).any() or (pos_rcv <= 0).any()), "The receivers must be inside the room"
 	assert Tdiff is None or Tdiff <= Tmax, "Tmax must be equal or greater than Tdiff"

@@ -252,8 +252,6 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 								  int M_src, int M_rcv, float c, float Fs) {
 	
 	extern __shared__ float sdata[];
-
-	float* orV_src = g_orV_src; // TODO: convert hard coded orientation to parameter
 	
 	int n[3];
 	n[0] = blockIdx.x * blockDim.x + threadIdx.x;
@@ -311,7 +309,15 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		}
 	}
 
-	// TODO copy orV_src to shared memory
+	// Copy g_orV_src to shared memory
+	float* sh_orV_src = &sh_orV_rcv[M_src*3];
+	if (threadIdx.x==0 && threadIdx.y==0)  {
+		for (int m=threadIdx.z; m<M_src; m+=blockDim.z) {
+			sh_orV_src[m*3  ] = g_orV_src[m*3  ];
+			sh_orV_src[m*3+1] = g_orV_src[m*3+1];
+			sh_orV_src[m*3+2] = g_orV_src[m*3+2];
+		}
+	}
 	
 	// Wait until the copies are completed
 	__syncthreads();
@@ -337,7 +343,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 			for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
 				float vec[3]; // Vector going from rcv to img src
 				float im_src_to_rcv[3]; // for speaker directivity: Vector going from img src to rcv
-				float orV_src_temp[3]; // temporary orV_src to prevent overwriting orV_src
+				float orV_src[3]; // temporary orV_src to prevent overwriting orV_src
 				float dist = 0;
 				for (int d=0; d<3; d++) {
 					// computing the vector going from the rcv to img src
@@ -345,13 +351,13 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 					dist += vec[d] * vec[d]; // euclidean distance
 					
 					// for speaker directivity
-					orV_src_temp[d] = (1-2*rflx_idx[d]) * orV_src[d]; // If rflx_id = 1 => -1 * orV_src. If rflx_id = 0 => 1 * orV_src
+					orV_src[d] = (1-2*rflx_idx[d]) * sh_orV_src[m_src*3+d]; // If rflx_id = 1 => -1 * orV_src. If rflx_id = 0 => 1 * orV_src
 					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin) (green dashed line)
 				}
 				dist = sqrtf(dist); // euclidean distance
 				float amp = rflx_att / (4*PI*dist);
 				amp *= mic_directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern);
-				amp *= mic_directivity(im_src_to_rcv, orV_src_temp, mic_pattern); 
+				amp *= mic_directivity(im_src_to_rcv, orV_src, spkr_pattern); 
 
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
