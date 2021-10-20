@@ -129,7 +129,7 @@ __device__ __forceinline__ float SabineT60( float room_sz_x, float room_sz_y, fl
 	return 0.161f * V / Sa;
 }
 
-__device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3], micPattern pattern) {
+__device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3], polarPattern pattern) {
 	if (pattern == DIR_OMNI) return 1.0f;
 	
 	float cosTheta = doaVec[0]*orVec[0] + doaVec[1]*orVec[1] + doaVec[2]*orVec[2];
@@ -245,15 +245,15 @@ __device__ __forceinline__ float image_sample_lut(float amp, float tau, float t,
 __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
 								  float* g_tau /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
 								  float* g_tau_dp /*[M_src]M_rcv]*/,
-								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_rcv/*[M_rcv][3]*/,
-								  micPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
+								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_src, float* g_orV_rcv/*[M_rcv][3]*/,
+								  polarPattern spkr_pattern, polarPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
 								  float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2, 
 								  int nb_img_x, int nb_img_y, int nb_img_z,
 								  int M_src, int M_rcv, float c, float Fs) {
 	
 	extern __shared__ float sdata[];
 
-	float orV_src[3] = {1, .5 , .1}; // TODO: convert hard coded orientation to parameter
+	float* orV_src = g_orV_src; // TODO: convert hard coded orientation to parameter
 	
 	int n[3];
 	n[0] = blockIdx.x * blockDim.x + threadIdx.x;
@@ -752,10 +752,10 @@ int gpuRIR_cuda::PadData(float *signal, float **padded_signal, int segment_len,
 /***********************/
 
 float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
-									   float* h_pos_rcv, float* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
+									   float* h_pos_rcv, float* h_orV_src, float* h_orV_rcv, polarPattern spkr_pattern, polarPattern mic_pattern, int M_rcv, int nb_img[3],
 									   float Tdiff, float Tmax, float Fs, float c) {	
 	// function float* cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
-	//									   float* h_pos_rcv, float* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
+	//									   float* h_pos_rcv, float* h_orV_rcv, polarPattern mic_pattern, int M_rcv, int nb_img[3],
 	//									   float Tdiff, float Tmax, float Fs, float c);
 	// Input parameters:
 	// 	float room_sz[3]		: Size of the room [m]
@@ -763,8 +763,10 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	//	float* h_pos_src 	: M_src x 3 matrix with the positions of the sources [m]
 	//	int M_src 				: Number of sources
 	//	float* h_pos_rcv 	: M_rcv x 3 matrix with the positions of the receivers [m]
+	//	float* h_orV_src 	: M_rcv x 3 matrix with vectors pointing in the same direction than the source
 	//	float* h_orV_rcv 	: M_rcv x 3 matrix with vectors pointing in the same direction than the receivers
-	//	micPattern mic_pattern 	: Polar pattern of the receivers (see gpuRIR_cuda.h)
+	//	polarPattern spkr_pattern 	: Polar pattern of the sources (see gpuRIR_cuda.h)
+	//	polarPattern mic_pattern 	: Polar pattern of the receivers (see gpuRIR_cuda.h)
 	//	int M_rcv 				: Number of receivers
 	//	int nb_img[3] 			: Number of sources in each dimension
 	//	float Tdiff			: Time when the ISM is replaced by a diffusse reverberation model [s]
@@ -773,12 +775,14 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	//	float c				: Speed of sound [m/s]
 	
 	// Copy host memory to GPU
-	float *pos_src, *pos_rcv, *orV_rcv;
+	float *pos_src, *pos_rcv, *orV_src, *orV_rcv;
 	gpuErrchk( cudaMalloc(&pos_src, M_src*3*sizeof(float)) );
 	gpuErrchk( cudaMalloc(&pos_rcv, M_rcv*3*sizeof(float)) );
+	gpuErrchk( cudaMalloc(&orV_src, M_src*3*sizeof(float)) );
 	gpuErrchk( cudaMalloc(&orV_rcv, M_rcv*3*sizeof(float)) );
 	gpuErrchk( cudaMemcpy(pos_src, h_pos_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	gpuErrchk( cudaMemcpy(pos_rcv, h_pos_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
+	gpuErrchk( cudaMemcpy(orV_src, h_orV_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	gpuErrchk( cudaMemcpy(orV_rcv, h_orV_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	
 	
@@ -798,7 +802,7 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	
 	calcAmpTau_kernel<<<numBlocksISM, threadsPerBlockISM, shMemISM>>> (
 		amp, tau, tau_dp,
-		pos_src, pos_rcv, orV_rcv, mic_pattern,
+		pos_src, pos_rcv, orV_src, orV_rcv, spkr_pattern, mic_pattern,
 		room_sz[0], room_sz[1], room_sz[2], 
 		beta[0], beta[1], beta[2], beta[3], beta[4], beta[5], 
 		nb_img[0], nb_img[1], nb_img[2],

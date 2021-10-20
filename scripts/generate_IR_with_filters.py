@@ -36,7 +36,9 @@ def generate_RIR():
     nb_rcv = 1  # Number of receivers
     pos_rcv = np.array([[4, 8, 1.7]])	 # Position of the receivers [m]
     # Vectors pointing in the same direction than the receivers
+    orV_src = np.matlib.repmat(np.array([0, -1, 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), nb_rcv, 1)
+    spkr_pattern = "card"  # Source polar pattern
     mic_pattern = "card"  # Receiver polar pattern
     abs_weights = [0.9]*5+[0.5]  # Absortion coefficient ratios of the walls
     T60 = 1.0	 # Time for the RIR to reach 60dB of attenuation [s]
@@ -56,7 +58,7 @@ def generate_RIR():
     # Number of image sources in each dimension
     nb_img = gpuRIR.t2n(Tdiff, room_sz)
     RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img,
-                              Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern)
+                              Tmax, fs, Tdiff=Tdiff, orV_src=orV_src, orV_rcv=orV_rcv, spkr_pattern=spkr_pattern, mic_pattern=mic_pattern)
 
     # return receiver channels (mono), number of receivers, sampling frequency and bit depth from RIRs.
     return RIRs[0], pos_rcv, fs, bit_depth

@@ -8,9 +8,9 @@ from scipy.signal import convolve
 
 from gpuRIR_bind import gpuRIR_bind
 
-__all__ = ["mic_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision", "activate_lut"]
+__all__ = ["polar_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision", "activate_lut"]
 
-mic_patterns =	{
+polar_patterns =	{
   "omni": 0,
   "homni": 1,
   "card": 2,
@@ -92,7 +92,7 @@ def t2n(T, rooms_sz, c=343.0):
 	nb_img = 2 * T / (np.array(rooms_sz) / c)
 	return [ int(n) for n in np.ceil(nb_img) ]
 
-def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, mic_pattern="omni", orV_rcv=None, c=343.0):
+def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, spkr_pattern="omni", mic_pattern="omni", orV_src=None, orV_rcv=None, c=343.0):
 	''' Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM).
 
 	Parameters
@@ -114,6 +114,14 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 	Tdiff : float, optional
 		Time (in seconds) when the ISM is replaced by a diffuse reverberation model.
 		Default is Tmax (full ISM simulation).
+	spkr_pattern : {"omni", "homni", "card", "hypcard", "subcard", "bidir"}, optional
+		Polar pattern of the sources (the same for all of them).
+			"omni" : Omnidireccional (default).
+			"homni": Half omnidireccional, 1 in front of the microphone, 0 backwards.
+			"card": Cardioid.
+			"hypcard": Hypercardioid.
+			"subcard": Subcardioid.
+			"bidir": Bidirectional, a.k.a. figure 8.
 	mic_pattern : {"omni", "homni", "card", "hypcard", "subcard", "bidir"}, optional
 		Polar pattern of the receivers (the same for all of them).
 			"omni" : Omnidireccional (default).
@@ -122,6 +130,9 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 			"hypcard": Hypercardioid.
 			"subcard": Subcardioid.
 			"bidir": Bidirectional, a.k.a. figure 8.
+	orV_src : ndarray with 2 dimensions and 3 columns or None, optional
+		Orientation of the sources as vectors pointing in the same direction.
+		None (default) is only valid for omnidireccional patterns.
 	orV_rcv : ndarray with 2 dimensions and 3 columns or None, optional
 		Orientation of the receivers as vectors pointing in the same direction.
 		None (default) is only valid for omnidireccional patterns.
@@ -139,21 +150,30 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, m
 	the GPU memory and crash the kernel.
 
 	'''
+	orV_src=orV_rcv
+
 	assert not ((pos_src >= room_sz).any() or (pos_src <= 0).any()), "The sources must be inside the room"
 	assert not ((pos_rcv >= room_sz).any() or (pos_rcv <= 0).any()), "The receivers must be inside the room"
 	assert Tdiff is None or Tdiff <= Tmax, "Tmax must be equal or greater than Tdiff"
-	assert mic_pattern in mic_patterns, "mic_pattern must be omni, homni, card, hypcard, subcard or bidir"
+	assert mic_pattern in polar_patterns, "mic_pattern must be omni, homni, card, hypcard, subcard or bidir"
 	assert mic_pattern == "omni" or orV_rcv is not None, "the mics are not omni but their orientation is undefined"
+	assert spkr_pattern in spkr_pattern, "spkr_pattern must be omni, homni, card, hypcard, subcard or bidir"
+	assert spkr_pattern == "omni" or orV_src is not None, "the sources are not omni but their orientation is undefined"
+
 	
 	pos_src = pos_src.astype('float32', order='C', copy=False)
 	pos_rcv = pos_rcv.astype('float32', order='C', copy=False)
 	
 	if Tdiff is None: Tdiff = Tmax
 	if mic_pattern is None: mic_pattern = "omni"
+	if spkr_pattern is None: spkr_pattern = "omni"
 	if orV_rcv is None: orV_rcv = np.zeros_like(pos_rcv)
 	else: orV_rcv = orV_rcv.astype('float32', order='C', copy=False)
+	if orV_src is None: orV_src = np.zeros_like(pos_src)
+	else: orV_src = orV_src.astype('float32', order='C', copy=False)
+
 		
-	return gpuRIR_bind_simulator.simulateRIR_bind(room_sz, beta, pos_src, pos_rcv, orV_rcv, mic_patterns[mic_pattern], nb_img, Tdiff, Tmax, fs, c)
+	return gpuRIR_bind_simulator.simulateRIR_bind(room_sz, beta, pos_src, pos_rcv, orV_src, orV_rcv, polar_patterns[spkr_pattern], polar_patterns[mic_pattern], nb_img, Tdiff, Tmax, fs, c)
 
 def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
 	''' Filter an audio signal by the RIRs of a motion trajectory recorded with a microphone array.
