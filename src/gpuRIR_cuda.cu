@@ -129,7 +129,7 @@ __device__ __forceinline__ float SabineT60( float room_sz_x, float room_sz_y, fl
 	return 0.161f * V / Sa;
 }
 
-__device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3], polarPattern pattern) {
+__device__ __forceinline__ float directivity(float doaVec[3], float orVec[3], polarPattern pattern) {
 	if (pattern == DIR_OMNI) return 1.0f;
 	
 	float cosTheta = doaVec[0]*orVec[0] + doaVec[1]*orVec[1] + doaVec[2]*orVec[2];
@@ -142,7 +142,7 @@ __device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3]
 		case DIR_HYPCARD:	return 0.25f + 0.75f*cosTheta;
 		case DIR_SUBCARD: 	return 0.75f + 0.25f*cosTheta;
 		case DIR_BIDIR: 	return cosTheta;
-		default: printf("Invalid microphone pattern.\n"); return 0.0f;
+		default: printf("Invalid polar pattern.\n"); return 0.0f;
 	}
 }
 
@@ -245,7 +245,7 @@ __device__ __forceinline__ float image_sample_lut(float amp, float tau, float t,
 __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
 								  float* g_tau /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
 								  float* g_tau_dp /*[M_src]M_rcv]*/,
-								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_src, float* g_orV_rcv/*[M_rcv][3]*/,
+								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_src/*[M_src][3]*/, float* g_orV_rcv/*[M_rcv][3]*/,
 								  polarPattern spkr_pattern, polarPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
 								  float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2, 
 								  int nb_img_x, int nb_img_y, int nb_img_z,
@@ -343,21 +343,21 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 			for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
 				float vec[3]; // Vector going from rcv to img src
 				float im_src_to_rcv[3]; // for speaker directivity: Vector going from img src to rcv
-				float orV_src[3]; // temporary orV_src to prevent overwriting orV_src
+				float orV_src[3]; // temporary orV_src to prevent overwriting sh_orV_src
 				float dist = 0;
 				for (int d=0; d<3; d++) {
 					// computing the vector going from the rcv to img src
 					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d]; 
-					dist += vec[d] * vec[d]; // euclidean distance
+					dist += vec[d] * vec[d]; 
 					
 					// for speaker directivity
 					orV_src[d] = (1-2*rflx_idx[d]) * sh_orV_src[m_src*3+d]; // If rflx_id = 1 => -1 * orV_src. If rflx_id = 0 => 1 * orV_src
-					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin) (green dashed line)
+					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin)
 				}
-				dist = sqrtf(dist); // euclidean distance
+				dist = sqrtf(dist);
 				float amp = rflx_att / (4*PI*dist);
-				amp *= mic_directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern);
-				amp *= mic_directivity(im_src_to_rcv, orV_src, spkr_pattern); 
+				amp *= directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern); // apply microphone directivity dampening
+				amp *= directivity(im_src_to_rcv, orV_src, spkr_pattern); // apply speaker directivity dampening
 
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
@@ -758,11 +758,13 @@ int gpuRIR_cuda::PadData(float *signal, float **padded_signal, int segment_len,
 /***********************/
 
 float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
-									   float* h_pos_rcv, float* h_orV_src, float* h_orV_rcv, polarPattern spkr_pattern, polarPattern mic_pattern, int M_rcv, int nb_img[3],
+									   float* h_pos_rcv, float* h_orV_src, float* h_orV_rcv, 
+									   polarPattern spkr_pattern, polarPattern mic_pattern, int M_rcv, int nb_img[3],
 									   float Tdiff, float Tmax, float Fs, float c) {	
 	// function float* cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
-	//									   float* h_pos_rcv, float* h_orV_rcv, polarPattern mic_pattern, int M_rcv, int nb_img[3],
-	//									   float Tdiff, float Tmax, float Fs, float c);
+	//								   float* h_pos_rcv, float* h_orV_src, float* h_orV_rcv, 
+	//								   polarPattern spkr_pattern, polarPattern mic_pattern, int M_rcv, int nb_img[3],
+	//								   float Tdiff, float Tmax, float Fs, float c);
 	// Input parameters:
 	// 	float room_sz[3]		: Size of the room [m]
 	//	float beta[6] 		: Reflection coefficients [beta_x1 beta_x2 beta_y1 beta_y2 beta_z1 beta_z2]
