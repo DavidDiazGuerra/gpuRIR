@@ -8,12 +8,12 @@ from scipy import signal
 def create_spectrogram(inner_file_path, title=""):
     fs, x = wavfile.read(inner_file_path)
     x = x[:, 0]
-    plt.rcParams.update({'font.size': 14})
+    plt.rcParams.update({'font.size': 18})
 
     f, t, Sxx = signal.spectrogram(x, fs, nfft=512)
-    plt.pcolormesh(t, f, 10*np.log10(Sxx/Sxx.max()),
+    plt.pcolormesh(t, f/1000, 10*np.log10(Sxx/Sxx.max()),
                    vmin=-100, vmax=0, cmap='inferno')
-    plt.ylabel('Frequenz [Hz]')
+    plt.ylabel('Frequenz [kHz]')
     plt.xlabel('Zeit [s]')
     plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
     plt.show()
