@@ -362,7 +362,10 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
 
-				if (direct_path) g_tau_dp[m_src*M_rcv + m_rcv] = dist / c * Fs;
+				if (direct_path){
+					g_tau_dp[m_src*M_rcv + m_rcv] = dist / c * Fs;
+					// printf("%f,",amp); // For creating polar pattern diagrams
+				} 
 			}
 		}
 	}

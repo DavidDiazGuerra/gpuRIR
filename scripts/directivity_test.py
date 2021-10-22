@@ -15,6 +15,7 @@ import gpuRIR
 from scipy.io import wavfile
 from scipy import signal
 
+PARTITIONS = 360
 
 def generate_RIR(src_degree):
     '''
@@ -36,8 +37,8 @@ def generate_RIR(src_degree):
     orV_src = np.matlib.repmat(
         np.array([np.cos(rad), np.sin(rad), 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([1, 0, 0]), nb_rcv, 1)
-    spkr_pattern = "homni"  # Source polar pattern
-    mic_pattern = "card"  # Receiver polar pattern
+    spkr_pattern = "bidir"  # Source polar pattern
+    mic_pattern = "omni"  # Receiver polar pattern
     abs_weights = [0.9]*5+[0.5]  # Absortion coefficient ratios of the walls
     T60 = 0.21	 # Time for the RIR to reach 60dB of attenuation [s]
     # Attenuation when start using the diffuse reverberation model [dB]
@@ -88,7 +89,7 @@ def create_waveform(x, fig, i, title=""):
     global limit
     #x=automatic_gain_increase(x, np.int32, -1)
     plt.rcParams.update({'font.size': 10})
-    ax = fig.add_subplot(3, 3, i+1)
+    ax = fig.add_subplot(int(np.sqrt(PARTITIONS)), int(np.sqrt(PARTITIONS)), i+1)
     if i == 0:
         limit=np.abs(np.max(x))
     plt.ylim(top=limit, bottom=-limit)
@@ -101,7 +102,7 @@ def create_spectrogram(x, fs, fig, i, title=""):
     plt.rcParams.update({'font.size': 10})
     f, t, Sxx = signal.spectrogram(x, fs, nfft=512)
 
-    ax = fig.add_subplot(3, 3, i+1)
+    ax = fig.add_subplot(int(np.sqrt(PARTITIONS)), int(np.sqrt(PARTITIONS)), i+1)
     
     plt.title(title)
 
@@ -114,8 +115,8 @@ def create_spectrogram(x, fs, fig, i, title=""):
 
 if __name__ == "__main__":
     fig = plt.figure(1)
-    for i in range(0, 9):
-        degree = i*40
+    for i in range(0, PARTITIONS):
+        degree = i * (360 / PARTITIONS)
 
         # Prepare sound data arrays.
         receiver_channels, pos_rcv, fs, bit_depth = generate_RIR(degree)
