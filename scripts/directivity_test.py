@@ -15,7 +15,10 @@ import gpuRIR
 from scipy.io import wavfile
 from scipy import signal
 
-PARTITIONS = 360
+PARTITIONS = 36
+PLOT_SPECTROGRAM = False
+PLOT_WAVEFORM = True
+
 
 def generate_RIR(src_degree):
     '''
@@ -62,36 +65,16 @@ def generate_RIR(src_degree):
     return RIRs[0], pos_rcv, fs, bit_depth
 
 
-def automatic_gain_increase(source, bit_depth, ceiling):
-    '''
-    Increases amplitude (loudness) to defined ceiling.
+limit = 1
 
-    :param list source: Sound data to process.
-    :param int bit_depth: Bit depth of source sound data.
-    :param int ceiling: Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to
-    :return: Amplified source sound data.
-    '''
-    peak = np.max(source)
-    negative_peak = np.abs(np.min(source))
-
-    # Check if the negative or positive peak is of a higher magnitude
-    if peak < negative_peak:
-        peak = negative_peak
-
-    max_gain = np.iinfo(bit_depth).max*10**(-ceiling/10)
-    factor = max_gain/peak
-
-    return source*factor
-
-limit=1
 
 def create_waveform(x, fig, i, title=""):
     global limit
-    #x=automatic_gain_increase(x, np.int32, -1)
     plt.rcParams.update({'font.size': 10})
-    ax = fig.add_subplot(int(np.sqrt(PARTITIONS)), int(np.sqrt(PARTITIONS)), i+1)
+    ax = fig.add_subplot(int(np.sqrt(PARTITIONS)),
+                         int(np.sqrt(PARTITIONS)), i+1)
     if i == 0:
-        limit=np.abs(np.max(x))
+        limit = np.abs(np.max(x))
     plt.ylim(top=limit, bottom=-limit)
     plt.title(title)
     plt.plot(x)
@@ -102,15 +85,16 @@ def create_spectrogram(x, fs, fig, i, title=""):
     plt.rcParams.update({'font.size': 10})
     f, t, Sxx = signal.spectrogram(x, fs, nfft=512)
 
-    ax = fig.add_subplot(int(np.sqrt(PARTITIONS)), int(np.sqrt(PARTITIONS)), i+1)
-    
+    ax = fig.add_subplot(int(np.sqrt(PARTITIONS)),
+                         int(np.sqrt(PARTITIONS)), i+1)
+
     plt.title(title)
 
     plt.pcolormesh(t, f/1000, 10*np.log10(Sxx/Sxx.max()),
                    vmin=-100, vmax=0, cmap='inferno')
     #plt.ylabel('Frequenz [kHz]')
     #plt.xlabel('Zeit [s]')
-    #plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
+    # plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
 
 
 if __name__ == "__main__":
@@ -132,16 +116,10 @@ if __name__ == "__main__":
         impulseResponseArray = np.concatenate(
             (impulseResponseArray, impulseResponseArray), axis=1)
 
-        # Write impulse response file
-        #filename = f'IR_{filename_appendix}_{time.time()}.wav'
-        #wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
-
         # Create spectrogram
-        create_waveform(receiver_channels[0], fig, i, f"{degree}°")
-        #create_spectrogram(receiver_channels[0], fs, fig, i, f"{degree}°")
-        
+        if PLOT_WAVEFORM:
+            create_waveform(receiver_channels[0], fig, i, f"{degree}°")
+        if PLOT_SPECTROGRAM:
+            create_spectrogram(receiver_channels[0], fs, fig, i, f"{degree}°")
 
-        # Visualize waveform of IR
-        # plt.title(filename_appendix)
-        # plt.plot(impulseResponseArray)
     plt.show()
