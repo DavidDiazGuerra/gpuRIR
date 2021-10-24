@@ -1,6 +1,6 @@
 
-// Accepted polar patterns for the receivers:
-typedef int micPattern;
+// Accepted polar patterns for the receivers and sources:
+typedef int polarPattern;
 #define DIR_OMNI 0
 #define DIR_HOMNI 1
 #define DIR_CARD 2
@@ -17,7 +17,7 @@ class gpuRIR_cuda {
 	public:
 		gpuRIR_cuda(bool, bool);
 
-		float* cuda_simulateRIR(float[3], float[6], float*, int, float*, float*, micPattern, int, int[3], float, float, float, float);
+		float* cuda_simulateRIR(float[3], float[6], float*, int, float*, float*, float*, polarPattern, polarPattern, int, int[3], float, float, float, float);
 		float* cuda_convolutions(float*, int, int, float*, int, int);
 		bool activate_mixed_precision(bool);
 		bool activate_lut(bool);
