@@ -15,9 +15,9 @@ import gpuRIR
 from scipy.io import wavfile
 from scipy import signal
 
-PARTITIONS = 36
+PARTITIONS = 360
 PLOT_SPECTROGRAM = False
-PLOT_WAVEFORM = True
+PLOT_WAVEFORM = False
 
 
 def generate_RIR(src_degree):
@@ -35,7 +35,7 @@ def generate_RIR(src_degree):
     nb_src = 1  # Number of sources
     pos_src = np.array([[4, 4, 1.7]])  # Positions of the sources ([m]
     nb_rcv = 1  # Number of receivers
-    pos_rcv = np.array([[12, 4, 1.7]])	 # Position of the receivers [m]
+    pos_rcv = np.array([[10, 4, 2]])	 # Position of the receivers [m]
     # Vectors pointing in the same direction than the receivers
     orV_src = np.matlib.repmat(
         np.array([np.cos(rad), np.sin(rad), 0]), nb_src, 1)
@@ -107,10 +107,6 @@ if __name__ == "__main__":
 
         # Stack array vertically
         impulseResponseArray = np.vstack(receiver_channels[0])
-
-        # Increase Amplitude to usable levels
-        impulseResponseArray = automatic_gain_increase(
-            impulseResponseArray, bit_depth, 3)
 
         # Create stereo file (dual mono)
         impulseResponseArray = np.concatenate(
