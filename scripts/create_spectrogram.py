@@ -12,7 +12,7 @@ def create_spectrogram(inner_file_path, title=""):
 
     f, t, Sxx = signal.spectrogram(x, fs, nfft=512)
     plt.pcolormesh(t, f/1000, 10*np.log10(Sxx/Sxx.max()),
-                   vmin=-100, vmax=0, cmap='inferno')
+                   vmin=-80, vmax=0, cmap='inferno')
     plt.ylabel('Frequenz [kHz]')
     plt.xlabel('Zeit [s]')
     plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
