@@ -2,7 +2,7 @@ from filters.filter import FilterStrategy
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import interp1d
 from scipy.signal import istft, stft
 
 '''
@@ -32,7 +32,7 @@ class CharacteristicFilter(FilterStrategy):
         # x: frequency [Hz]
         y = freq_response[:, 1]
         x = freq_response[:, 0]
-        f = CubicSpline(x, y)
+        f = interp1d(x, y, fill_value=-100, bounds_error=False)
         x_interpolated = np.arange(1, 20000)
         y_interpolated = f(x_interpolated)
         if plot:

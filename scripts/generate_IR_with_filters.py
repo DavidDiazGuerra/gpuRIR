@@ -30,11 +30,12 @@ def generate_RIR():
     gpuRIR.activateMixedPrecision(False)
     gpuRIR.activateLUT(False)
 
-    room_sz = [8, 10, 3]  # Size of the room [m]
-    nb_src = 2  # Number of sources
-    pos_src = np.array([[4, 2, 1.7],[2, 4, 1.7]])  # Positions of the sources ([m]
-    nb_rcv = 2  # Number of receivers
-    pos_rcv = np.array([[4, 8, 1.7], [2, 5, 1.7]])	 # Position of the receivers [m]
+
+    room_sz = [5, 4, 3]  # Size of the room [m]
+    nb_src = 1  # Number of sources
+    pos_src = np.array([[1, 1, 1.6]])  # Positions of the sources ([m]
+    nb_rcv = 1  # Number of receivers
+    pos_rcv = np.array([[4, 3, 1.6]])	 # Position of the receivers [m]
     # Vectors pointing in the same direction than the receivers
     orV_src = np.matlib.repmat(np.array([0, -1, 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), nb_rcv, 1)
@@ -86,7 +87,7 @@ def automatic_gain_increase(source, bit_depth, ceiling):
     return source*factor
 
 
-def generate_IR(source, filters, bit_depth):
+def generate_IR(source, filters, bit_depth, visualize=True):
     '''
     Generates an IR file out of given source sound data and an optional array of filters to be applied.
 
@@ -120,13 +121,15 @@ def generate_IR(source, filters, bit_depth):
     filename = f'IR_{filename_appendix}_{time.time()}.wav'
     wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
 
-    # Create spectrogram
-    create_spectrogram(filename, filename_appendix)
+    if visualize:
+        # Create spectrogram
+        create_spectrogram(filename, filename_appendix)
 
-    # Visualize waveform of IR
-    plt.title(filename_appendix)
-    plt.plot(impulseResponseArray)
-    plt.show()
+        # Visualize waveform of IR
+        #plt.title(filename_appendix)
+        plt.plot(impulseResponseArray)
+        plt.show()
+
 
 
 if __name__ == "__main__":
@@ -137,10 +140,8 @@ if __name__ == "__main__":
         filters = [
             # Speaker simulation
             #LinearFilter(101, (0, 100, 150, 7000, 7001, fs/2), (0, 0, 1, 1, 0, 0), fs),
-            
             # Air absorption simulation
             #AirAbsBandpass(),
-
             # Mic simulation
             #CharacteristicFilter(cm.sm57_freq_response, fs),
         ]
