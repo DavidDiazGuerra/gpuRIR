@@ -3,24 +3,39 @@ Generates an impulse response WAV file (IR) with optional filters.
 Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
 """
 import librosa
-
 import filters.air_absorption_calculation as aa
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
 from math import ceil
-#from scipy.io import wavfile
 import time
 import gpuRIR
 from scipy.io import wavfile
 from scipy import signal
-
-PARTITIONS = 360
-PLOT_SPECTROGRAM = False
-PLOT_WAVEFORM = False
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
-def generate_RIR(src_degree):
+# Feel free to change these parameters
+PARTITIONS = 81
+PLOT_SPECTROGRAM = False  # Works only with 16 or less partitions!
+PLOT_WAVEFORM = False  # Works only with 16 or less partitions!
+PLOT_POLAR = True
+
+
+# Don't change these things
+POLAR_PATTERNS = np.array(
+    ["omni", "homni", "card", "hypcard", "subcard", "bidir"])
+MAX_VALUES = np.zeros((POLAR_PATTERNS.shape[0], PARTITIONS))
+PARTITION_LIMIT = 16 # only for spectrogram and waveform plots
+
+
+# Check if spectrogram / waveform plot count limit is violated
+if PLOT_SPECTROGRAM or PLOT_WAVEFORM:
+    assert(int(np.sqrt(PARTITIONS)) ** 2 == PARTITIONS)
+
+
+def generate_RIR(src_degree, polar_pattern):
     '''
     Generates RIRs from the gpuRIR library.
 
@@ -40,7 +55,7 @@ def generate_RIR(src_degree):
     orV_src = np.matlib.repmat(
         np.array([np.cos(rad), np.sin(rad), 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([1, 0, 0]), nb_rcv, 1)
-    spkr_pattern = "bidir"  # Source polar pattern
+    spkr_pattern = polar_pattern  # Source polar pattern
     mic_pattern = "omni"  # Receiver polar pattern
     abs_weights = [0.9]*5+[0.5]  # Absortion coefficient ratios of the walls
     T60 = 0.21	 # Time for the RIR to reach 60dB of attenuation [s]
@@ -65,23 +80,22 @@ def generate_RIR(src_degree):
     return RIRs[0], pos_rcv, fs, bit_depth
 
 
-limit = 1
+WAVEFORM_LIMIT = 1  # Ensure waveform values don't get overwritten
 
 
 def create_waveform(x, fig, i, title=""):
-    global limit
+    global WAVEFORM_LIMIT
     plt.rcParams.update({'font.size': 10})
     ax = fig.add_subplot(int(np.sqrt(PARTITIONS)),
                          int(np.sqrt(PARTITIONS)), i+1)
     if i == 0:
-        limit = np.abs(np.max(x))
-    plt.ylim(top=limit, bottom=-limit)
+        WAVEFORM_LIMIT = np.abs(np.max(x))
+    plt.ylim(top=WAVEFORM_LIMIT, bottom=-WAVEFORM_LIMIT)
     plt.title(title)
     plt.plot(x)
 
 
 def create_spectrogram(x, fs, fig, i, title=""):
-    #x = x[:, 0]
     plt.rcParams.update({'font.size': 10})
     f, t, Sxx = signal.spectrogram(x, fs, nfft=512)
 
@@ -92,30 +106,107 @@ def create_spectrogram(x, fs, fig, i, title=""):
 
     plt.pcolormesh(t, f/1000, 10*np.log10(Sxx/Sxx.max()),
                    vmin=-100, vmax=0, cmap='inferno')
-    #plt.ylabel('Frequenz [kHz]')
-    #plt.xlabel('Zeit [s]')
-    # plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
+
+
+def normalize_amps(amps):
+    amps_normalized = np.copy(amps)
+    max_value = np.max(amps_normalized)
+    for i in range(0, len(amps_normalized)):
+        amps_normalized[i] /= max_value
+    return np.abs(amps_normalized)
+
+
+COLORS = ['mediumseagreen', 'darkorange',
+          'mediumpurple', 'magenta', 'limegreen', 'royalblue']
+
+
+def create_polar_plot(fig, i, amps, name):
+    fig.add_trace(go.Scatterpolar(
+        r=normalize_amps(amps),
+        theta=np.linspace(0, 360, len(amps)),
+        mode='lines',
+        name=name,
+        line_color=COLORS[i],
+        line_width=3,
+        subplot=f"polar{i+1}"
+    ), 1 if i <= 2 else 2, (i % 3) + 1)
+
+
+def create_polar_plots(title=""):
+    fig_polar = make_subplots(rows=2, cols=3, specs=[[{'type': 'polar'}]*3]*2)
+    for i in range(6):
+        create_polar_plot(fig_polar, i, MAX_VALUES[i], POLAR_PATTERNS[i])
+    fig_polar.update_layout(
+        font_size=22,
+        showlegend=True,
+
+        # TODO: Make this stuff dynamic
+        polar1=dict(
+            radialaxis=dict(type="log", tickangle=45),
+            radialaxis_range=[-1, 0.1],
+            radialaxis_tickfont_size=18
+        ),
+        polar2=dict(
+            radialaxis=dict(type="log", tickangle=45),
+            radialaxis_range=[-1, 0.1],
+            radialaxis_tickfont_size=18
+        ),
+        polar3=dict(
+            radialaxis=dict(type="log", tickangle=45),
+            radialaxis_range=[-1, 0.1],
+            radialaxis_tickfont_size=18
+        ),
+        polar4=dict(
+            radialaxis=dict(type="log", tickangle=45),
+            radialaxis_range=[-1, 0.1],
+            radialaxis_tickfont_size=18
+        ),
+        polar5=dict(
+            radialaxis=dict(type="log", tickangle=45),
+            radialaxis_range=[-1, 0.1],
+            radialaxis_tickfont_size=18
+        ),
+        polar6=dict(
+            radialaxis=dict(type="log", tickangle=45),
+            radialaxis_range=[-1, 0.1],
+            radialaxis_tickfont_size=18
+        ),
+    )
+    fig_polar.show()
 
 
 if __name__ == "__main__":
-    fig = plt.figure(1)
-    for i in range(0, PARTITIONS):
-        degree = i * (360 / PARTITIONS)
+    fig_wf = plt.figure(1)
+    fig_sp = plt.figure(2)
 
-        # Prepare sound data arrays.
-        receiver_channels, pos_rcv, fs, bit_depth = generate_RIR(degree)
+    for p in range(len(POLAR_PATTERNS)):
+        for i in range(0, PARTITIONS):
+            degree = i * (360 / PARTITIONS)
 
-        # Stack array vertically
-        impulseResponseArray = np.vstack(receiver_channels[0])
+            # Prepare sound data arrays.
+            receiver_channels, pos_rcv, fs, bit_depth = generate_RIR(
+                degree, POLAR_PATTERNS[p])
 
-        # Create stereo file (dual mono)
-        impulseResponseArray = np.concatenate(
-            (impulseResponseArray, impulseResponseArray), axis=1)
+            # Stack array vertically
+            impulseResponseArray = np.vstack(receiver_channels[0])
 
-        # Create spectrogram
-        if PLOT_WAVEFORM:
-            create_waveform(receiver_channels[0], fig, i, f"{degree}°")
-        if PLOT_SPECTROGRAM:
-            create_spectrogram(receiver_channels[0], fs, fig, i, f"{degree}°")
+            # Extract biggest peak for polar pattern plotting
+            MAX_VALUES[p][i] = np.max(impulseResponseArray)
+            negative_peak = np.abs(np.min(impulseResponseArray))
+            if MAX_VALUES[p][i] < negative_peak:
+                MAX_VALUES[p][i] = negative_peak
 
-    plt.show()
+            # Create plots
+            if PLOT_WAVEFORM and PARTITIONS <= PARTITION_LIMIT:
+                plt.figure(1)
+                create_waveform(receiver_channels[0], fig_wf, i, f"{degree}°")
+            if PLOT_SPECTROGRAM and PARTITIONS <= PARTITION_LIMIT:
+                plt.figure(2)
+                create_spectrogram(
+                    receiver_channels[0], fs, fig_sp, i, f"{degree}°")
+
+    if PLOT_POLAR:
+        create_polar_plots()
+
+    if (PLOT_SPECTROGRAM or PLOT_WAVEFORM) and PARTITIONS <= PARTITION_LIMIT:
+        plt.show()
