@@ -17,6 +17,8 @@ def create_polar_plot(i, fig, amps, title):
     print(f"{len(amps)}")
     theta = np.linspace(0, 2*np.pi, len(amps))  # angles
     ax = fig.add_subplot(2, 3, i+1, projection='polar')
+    #ax.set_rlim(0)
+    ax.set_rscale('log')
     ax.plot(theta, amps)
     ax.grid(True)
     ax.set_title(title, va='center')
