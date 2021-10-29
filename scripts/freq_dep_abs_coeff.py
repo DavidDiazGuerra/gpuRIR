@@ -40,7 +40,7 @@ def generate_RIR(abs_weights):
     orV_src = np.matlib.repmat(np.array([0, -1, 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), nb_rcv, 1)
     spkr_pattern = "card"  # Source polar pattern
-    mic_pattern = "card"  # Receiver polar pattern
+    mic_pattern = "omni"  # Receiver polar pattern
     T60 = 1.0	 # Time for the RIR to reach 60dB of attenuation [s]
     # Attenuation when start using the diffuse reverberation model [dB]
     att_diff = 15.0
@@ -48,8 +48,10 @@ def generate_RIR(abs_weights):
     fs = 44100  # Sampling frequency [Hz]
     # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
     bit_depth = np.int32
-    beta = gpuRIR.beta_SabineEstimation(
-        room_sz, T60, abs_weights=abs_weights)  # Reflection coefficients
+    #beta = gpuRIR.beta_SabineEstimation(
+    #    room_sz, T60, abs_weights=abs_weights)  # Reflection coefficients
+    beta = 6*[1.] - abs_weights
+    
     # Time to start the diffuse reverberation model [s]
     Tdiff = gpuRIR.att2t_SabineEstimator(att_diff, T60)
     # Time to stop the simulation [s]
@@ -95,6 +97,7 @@ def create_bandpass_filter(lowcut, highcut, fs, order=10):
     b, a = butter(order, [low, high], btype='bandpass')
     return b, a
 
+
 '''
 Applies a butterworth bandpass filter.
 '''
@@ -103,6 +106,7 @@ def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
         lowcut, highcut, fs, order=order)
     y = lfilter(b, a, data)     # Single Filter
     return y
+
 
 def automatic_gain_increase(source, bit_depth, ceiling):
     '''
@@ -124,6 +128,7 @@ def automatic_gain_increase(source, bit_depth, ceiling):
     factor = max_gain/peak
 
     return source*factor
+
 
 '''
 abs_weights [6]:    Absortion coefficient ratios of the walls
@@ -161,7 +166,7 @@ def generate_RIR_bandpassed():
         bands[band_num - 1] = [band_min, band_mean, band_max]
 
     # Here we select the 6 materials we want the room to consist of:
-    wall_materials =  2 * [mat.water, mat.double_window, mat.fiber_plaster]
+    wall_materials =  6 * [mat.brick]
     # We create 6 interpolating functions for each material:
     wall_mat_interp = [interpolate_pair(mat, PLOT_ABS_COEFF_CURVES) for mat in wall_materials]
     if PLOT_ABS_COEFF_CURVES: show_plot()
