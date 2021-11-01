@@ -16,7 +16,7 @@ abs_weights [6]: Absortion coefficient ratios of the walls
 '''
 
 
-def generate_RIR(abs_weights):
+def generate_RIR(abs_weights, pos_rcv):
     '''
     Generates RIRs from the gpuRIR library.
 
@@ -26,13 +26,11 @@ def generate_RIR(abs_weights):
     gpuRIR.activateLUT(False)
 
     room_sz = [6, 5, 3]  # Size of the room [m]
-    nb_src = 1  # Number of sources
     pos_src = np.array([[1, 1, 1.6]])  # Positions of the sources ([m]
-    nb_rcv = 1  # Number of receivers
-    pos_rcv = np.array([[4, 3, 1.6]])	 # Position of the receivers [m]
+    #pos_rcv = np.array([[4, 3, 1.6]])	 # Position of the receivers [m]
     # Vectors pointing in the same direction than the receivers
-    orV_src = np.matlib.repmat(np.array([0, -1, 0]), nb_src, 1)
-    orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), nb_rcv, 1)
+    orV_src = np.matlib.repmat(np.array([0, -1, 0]), len(pos_src), 1)
+    orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), len(pos_rcv), 1)
     spkr_pattern = "omni"  # Source polar pattern
     mic_pattern = "card"  # Receiver polar pattern
     T60 = 1.0	 # Time for the RIR to reach 60dB of attenuation [s]
@@ -135,6 +133,8 @@ freq_high:          Where bandpass starts to cut off
 
 
 def generate_RIR_freq_dep_walls(wall_materials, divisions=10, order=3, plot=False):
+    pos_rcv = np.array([[4, 3, 1.6]])
+
     min_frequency = 20
     max_frequency = 20000
 
@@ -165,22 +165,26 @@ def generate_RIR_freq_dep_walls(wall_materials, divisions=10, order=3, plot=Fals
     if plot:
         show_plot()
 
-    RIRs = []
-    #receiver_channels = []
-    pos_rcv = [0, 0, 0]
     fs = 0
     bit_depth = 0
+    receiver_channels = np.zeros((len(pos_rcv), 1))
 
-    for band in bands:
+    for i in range(len(bands)):
+        band = bands[i]
         abs_coeffs = np.zeros(len(wall_mat_interp))
         for i in range(len(wall_mat_interp)):
             abs_coeffs[i] = wall_mat_interp[i](band[1])
         # Generate RIR
-        RIR, pos_rcv, fs, bit_depth = generate_RIR(abs_coeffs)
-        # Bandpass RIR
-        bandpassed = apply_bandpass_filter(RIR[0], band[0], band[2], fs, order)
-        print(bandpassed)
-        RIRs.append(bandpassed)
+        RIR, pos_rcv, fs, bit_depth = generate_RIR(abs_coeffs, pos_rcv)
+
+        for rcv in range(len(pos_rcv)):
+            # Bandpass RIR
+            bandpassed = apply_bandpass_filter(RIR[rcv], band[0], band[2], fs, order)
+            print(bandpassed)
+            receiver_channels.resize(len(pos_rcv), len(bandpassed))
+            receiver_channels[rcv] += bandpassed
+
+
 
     # Sum up all bandpassed RIR's per receiver
-    return np.add(0, np.array(RIRs).sum(axis=0)), pos_rcv, fs, bit_depth
+    return receiver_channels, pos_rcv, fs, bit_depth

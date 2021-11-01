@@ -144,7 +144,7 @@ if __name__ == "__main__":
     wall_materials = 6 * [mat.wood_16mm_on_40mm_slats]
 
     if freq_dep_abs_coeff:
-        receiver_channel, pos_rcv, fs, bit_depth = fdac.generate_RIR_freq_dep_walls(wall_materials)
+        receiver_channels, pos_rcv, fs, bit_depth = fdac.generate_RIR_freq_dep_walls(wall_materials)
     else:
         receiver_channels, pos_rcv, fs, bit_depth = generate_RIR()
     
@@ -159,7 +159,5 @@ if __name__ == "__main__":
             # Mic simulation
             #CharacteristicFilter(cm.sm57_freq_response, fs),
         ]
-        if freq_dep_abs_coeff:
-            generate_IR(receiver_channel, filters, bit_depth)
-        else:
-            generate_IR(receiver_channels[i], filters, bit_depth)
+        
+        generate_IR(receiver_channels[i], filters, bit_depth)
