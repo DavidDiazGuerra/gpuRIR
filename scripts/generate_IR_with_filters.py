@@ -9,7 +9,12 @@ from filters.air_absorption_bandpass import AirAbsBandpass
 from filters.air_absorption_stft import AirAbsSTFT
 from filters.linear_filter import LinearFilter
 
+import filters.characteristic_models as cm
 import filters.air_absorption_calculation as aa
+
+from wall_absorption.materials import Materials as mat
+import wall_absorption.freq_dep_abs_coeff as fdac
+
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -18,7 +23,7 @@ from scipy.io import wavfile
 import time
 import gpuRIR
 from create_spectrogram import create_spectrogram
-import filters.characteristic_models as cm
+
 
 
 def generate_RIR():
@@ -133,7 +138,16 @@ def generate_IR(source, filters, bit_depth, visualize=True):
 
 
 if __name__ == "__main__":
-    receiver_channels, pos_rcv, fs, bit_depth = generate_RIR()
+    # Apply frequency dependent wall absorption coefficients
+    freq_dep_abs_coeff = True
+    # Wall, floor and ceiling materials the room is consisting of
+    wall_materials = 6 * [mat.wood_16mm_on_40mm_slats]
+
+    if freq_dep_abs_coeff:
+        receiver_channel, pos_rcv, fs, bit_depth = fdac.generate_RIR_freq_dep_walls(wall_materials)
+    else:
+        receiver_channels, pos_rcv, fs, bit_depth = generate_RIR()
+    
     for i in range(0, len(pos_rcv)):
         # All listed filters wil be applied in that order.
         # Leave filters array empty if no filters should be applied.
@@ -145,4 +159,7 @@ if __name__ == "__main__":
             # Mic simulation
             #CharacteristicFilter(cm.sm57_freq_response, fs),
         ]
-        generate_IR(receiver_channels[i], filters, bit_depth)
+        if freq_dep_abs_coeff:
+            generate_IR(receiver_channel, filters, bit_depth)
+        else:
+            generate_IR(receiver_channels[i], filters, bit_depth)

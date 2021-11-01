@@ -1,18 +1,11 @@
-from filters.filter import Filter
-import librosa
-
-import filters.air_absorption_calculation as aa
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
 from math import ceil
-from scipy.io import wavfile
 from scipy.interpolate import interp1d
 import time
 import gpuRIR
-from create_spectrogram import create_spectrogram
-import filters.characteristic_models as cm
-import filters.materials as mat
+from .materials import Materials as mat
 
 from scipy.signal import butter, lfilter, filtfilt
 import multiprocessing
@@ -21,6 +14,8 @@ from multiprocessing import Pool
 '''
 abs_weights [6]: Absortion coefficient ratios of the walls
 '''
+
+
 def generate_RIR(abs_weights):
     '''
     Generates RIRs from the gpuRIR library.
@@ -30,8 +25,7 @@ def generate_RIR(abs_weights):
     gpuRIR.activateMixedPrecision(False)
     gpuRIR.activateLUT(False)
 
-
-    room_sz = [5, 4, 3]  # Size of the room [m]
+    room_sz = [6, 5, 3]  # Size of the room [m]
     nb_src = 1  # Number of sources
     pos_src = np.array([[1, 1, 1.6]])  # Positions of the sources ([m]
     nb_rcv = 1  # Number of receivers
@@ -39,8 +33,8 @@ def generate_RIR(abs_weights):
     # Vectors pointing in the same direction than the receivers
     orV_src = np.matlib.repmat(np.array([0, -1, 0]), nb_src, 1)
     orV_rcv = np.matlib.repmat(np.array([0, 1, 0]), nb_rcv, 1)
-    spkr_pattern = "card"  # Source polar pattern
-    mic_pattern = "omni"  # Receiver polar pattern
+    spkr_pattern = "omni"  # Source polar pattern
+    mic_pattern = "card"  # Receiver polar pattern
     T60 = 1.0	 # Time for the RIR to reach 60dB of attenuation [s]
     # Attenuation when start using the diffuse reverberation model [dB]
     att_diff = 15.0
@@ -48,10 +42,10 @@ def generate_RIR(abs_weights):
     fs = 44100  # Sampling frequency [Hz]
     # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
     bit_depth = np.int32
-    #beta = gpuRIR.beta_SabineEstimation(
+    # beta = gpuRIR.beta_SabineEstimation(
     #    room_sz, T60, abs_weights=abs_weights)  # Reflection coefficients
     beta = 6*[1.] - abs_weights
-    
+
     # Time to start the diffuse reverberation model [s]
     Tdiff = gpuRIR.att2t_SabineEstimator(att_diff, T60)
     # Time to stop the simulation [s]
@@ -68,6 +62,8 @@ def generate_RIR(abs_weights):
 '''
 Interpolates frequency response array with cubic spline method.
 '''
+
+
 def interpolate_pair(abs_coeff, plot):
     # y: absorption coefficient
     # x: frequency [Hz]
@@ -76,10 +72,11 @@ def interpolate_pair(abs_coeff, plot):
     f = interp1d(x, y, bounds_error=False, fill_value='extrapolate')
     x_interpolated = np.arange(1, 20000)
     y_interpolated = f(x_interpolated)
-    if plot: 
+    if plot:
         plt.plot(x, y, 'o')
-        plt.plot(x_interpolated, y_interpolated, "-")    
+        plt.plot(x_interpolated, y_interpolated, "-")
     return f
+
 
 def show_plot():
     plt.xlim(right=20000)
@@ -90,7 +87,7 @@ def show_plot():
 '''
 Returns a butterworth bandpass filter.
 '''
-def create_bandpass_filter(lowcut, highcut, fs, order=10):
+def create_bandpass_filter(lowcut, highcut, fs, order=9):
     nyq = 0.5 * fs
     low = (lowcut / nyq)
     high = highcut / nyq
@@ -135,13 +132,11 @@ abs_weights [6]:    Absortion coefficient ratios of the walls
 freq_low:           Where bandpass starts to pass
 freq_high:          Where bandpass starts to cut off
 '''
-def generate_RIR_bandpassed():
-    BUTTER_ORDER= 3
+
+
+def generate_RIR_freq_dep_walls(wall_materials, divisions=10, order=3, plot=False):
     min_frequency = 20
     max_frequency = 20000
-    PLOT_ABS_COEFF_CURVES = False
-    # number of bands
-    divisions = 10
 
     band = max_frequency / divisions
 
@@ -149,7 +144,7 @@ def generate_RIR_bandpassed():
     bands = np.zeros((divisions, 3))
 
     # Loop through each band
-    for band_num in range (1, divisions + 1):
+    for band_num in range(1, divisions + 1):
         # Upper ceiling of each band
         band_max = (band * band_num)
 
@@ -165,47 +160,27 @@ def generate_RIR_bandpassed():
         # Fill up array
         bands[band_num - 1] = [band_min, band_mean, band_max]
 
-    # Here we select the 6 materials we want the room to consist of:
-    wall_materials =  6 * [mat.brick]
     # We create 6 interpolating functions for each material:
-    wall_mat_interp = [interpolate_pair(mat, PLOT_ABS_COEFF_CURVES) for mat in wall_materials]
-    if PLOT_ABS_COEFF_CURVES: show_plot()
-
+    wall_mat_interp = [interpolate_pair(mat, plot) for mat in wall_materials]
+    if plot:
+        show_plot()
 
     RIRs = []
-    bit_depth = 0
+    #receiver_channels = []
+    pos_rcv = [0, 0, 0]
     fs = 0
+    bit_depth = 0
 
     for band in bands:
-        abs_coeffs=np.zeros(len(wall_mat_interp))
+        abs_coeffs = np.zeros(len(wall_mat_interp))
         for i in range(len(wall_mat_interp)):
-            abs_coeffs[i]=wall_mat_interp[i](band[1])
+            abs_coeffs[i] = wall_mat_interp[i](band[1])
         # Generate RIR
-        RIR, _, fs, bit_depth = generate_RIR(abs_coeffs)
+        RIR, pos_rcv, fs, bit_depth = generate_RIR(abs_coeffs)
         # Bandpass RIR
-        bandpassed = apply_bandpass_filter(RIR[0], band[0], band[2], fs, BUTTER_ORDER)
+        bandpassed = apply_bandpass_filter(RIR[0], band[0], band[2], fs, order)
+        print(bandpassed)
         RIRs.append(bandpassed)
 
-    # Sum up all bandpassed RIR's
-    final_RIR = np.add(0, np.array(RIRs).sum(axis=0))
-
-    # Write file
-    # Stack array vertically
-    impulseResponseArray = np.vstack(final_RIR)
-
-    # Increase Amplitude to usable levels
-    impulseResponseArray = automatic_gain_increase(
-        impulseResponseArray, bit_depth, 3)
-
-    # Create stereo file (dual mono)
-    impulseResponseArray = np.concatenate(
-        (impulseResponseArray, impulseResponseArray), axis=1)
-
-    filename = f'IR_abs_coeff_{time.time()}.wav'
-    wavfile.write(filename, fs, impulseResponseArray.astype(bit_depth))
-
-    create_spectrogram(filename, "Jerkop")
-    
-
-generate_RIR_bandpassed()
-
+    # Sum up all bandpassed RIR's per receiver
+    return np.add(0, np.array(RIRs).sum(axis=0)), pos_rcv, fs, bit_depth
