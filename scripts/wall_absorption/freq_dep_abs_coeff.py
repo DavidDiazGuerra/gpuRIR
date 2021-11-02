@@ -93,12 +93,10 @@ def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
         bands[band_num - 1] = [band_min, band_mean, band_max]
 
     # We create 6 interpolating functions for each material:
-    wall_mat_interp = [interpolate_pair(mat, plot) for mat in params.wall_coeffs]
+    wall_mat_interp = [interpolate_pair(mat, plot) for mat in params.wall_materials]
     if plot:
         show_plot()
 
-    fs = 0
-    bit_depth = 0
     receiver_channels = np.zeros((len(params.pos_rcv), 1))
 
     for i in range(len(bands)):
@@ -108,14 +106,14 @@ def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
             abs_coeffs[i] = wall_mat_interp[i](band[1])
         # Generate RIR
         params.beta = 6 * [1.] - abs_coeffs
-        RIR, params.pos_rcv, fs, bit_depth = generate_RIR(params)
+        RIR = generate_RIR(params)
 
         for rcv in range(len(params.pos_rcv)):
             # Bandpass RIR
-            bandpassed = apply_bandpass_filter(RIR[rcv], band[0], band[2], fs, order)
+            bandpassed = apply_bandpass_filter(RIR[rcv], band[0], band[2], params.fs, order)
             print(bandpassed)
             receiver_channels.resize(len(params.pos_rcv), len(bandpassed))
             receiver_channels[rcv] += bandpassed
 
     # Sum up all bandpassed RIR's per receiver
-    return receiver_channels, params.pos_rcv, fs, bit_depth
+    return receiver_channels

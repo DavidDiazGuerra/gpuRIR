@@ -18,8 +18,8 @@ class RoomParameters:
         att_max,
         fs,
         bit_depth,
-        wall_coeffs,
-        beta_direct=False):
+        abs_weights = 5 * [0.9] + [0.5],
+        wall_materials = None):
 
         self.room_sz = room_sz
         self.pos_src = np.array(pos_src)
@@ -31,14 +31,11 @@ class RoomParameters:
         self.T60 = T60
         self.fs = fs
         self.bit_depth = bit_depth
-        self.wall_coeffs = wall_coeffs
+        self.abs_weights = abs_weights
+        self.wall_materials = wall_materials
 
         # Switch between self-determined wall coefficients used for frequency dependent wall absorption coefficients
-        if not beta_direct:
-            self.beta = gpuRIR.beta_SabineEstimation(
-                room_sz, T60, abs_weights=wall_coeffs)  # Reflection coefficients
-        #else:
-            #self.beta = 6*[1.] - wall_coeffs
+        self.beta = gpuRIR.beta_SabineEstimation(room_sz, T60, abs_weights=abs_weights)  # Reflection coefficients
 
         # Time to start the diffuse reverberation model [s]
         self.Tdiff = gpuRIR.att2t_SabineEstimator(att_diff, T60)

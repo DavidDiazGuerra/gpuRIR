@@ -15,4 +15,4 @@ def generate_RIR(param):
                               spkr_pattern=param.spkr_pattern, mic_pattern=param.mic_pattern)
 
     # return receiver channels (mono), number of receivers, sampling frequency and bit depth from RIRs.
-    return RIRs[0], param.pos_rcv, param.fs, param.bit_depth
+    return RIRs[0]
