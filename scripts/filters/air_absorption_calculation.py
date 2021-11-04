@@ -104,6 +104,8 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     #                                 dividing, h the humidity in percent 
     #                                 molecular concentration by 100 to 
     #                                 convert it to a fraction. 
+    #
+    # ported      October 6   2021    Ported from Matlab to Python 
     # 
     # **********************************************************************
     # 
@@ -139,9 +141,7 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     c = (1+0.16*h/100) * c0 * np.sqrt(T/T01)
     c_iso = (1+0.16*h_iso/100)*c0*np.sqrt(T/T01)
 
-    # #
     # # **********************************************************************
-    #
     #
     # Bass formula
 
@@ -154,9 +154,7 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     alpha = 20*np.log10(np.exp(1))*ps*F**2*(1.84*10**(-11)*(T/T0)**(0.5)*ps0+((T/T0)**(-5/2))
                                             * (0.01275*np.exp(-2239.1/T)/(Fr0+F**2/Fr0)+0.1068*np.exp(-3352/T)/(FrN+F**2/FrN)))
 
-    # #
     # # **********************************************************************
-    #
     #
     # ISO formula
 
