@@ -61,9 +61,9 @@ def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
 
 
 '''
-abs_weights [6]:    Absortion coefficient ratios of the walls
-freq_low:           Where bandpass starts to pass
-freq_high:          Where bandpass starts to cut off
+params:             gpuRIR parameters
+divisions:          Count of divisions the frequency spectrum gets divided into
+order:              Where bandpass starts to cut off
 '''
 def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
     min_frequency = 20
@@ -73,14 +73,27 @@ def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
     # Structure: min / mean / max
     bands = np.zeros((divisions, 3))
 
+    # Find out minimum and maximum frequency value of all materials
+    material_frequencies = np.vstack(params.wall_materials)[:, 0]
+    min_mat_frequency = np.min(material_frequencies)
+    max_mat_frequency = np.max(material_frequencies)
+
+    # Outside of the material bounds, absorption values are constant. (Not wasting bands)
+    bands[0] = [min_frequency, (min_frequency + min_mat_frequency) / 2, min_mat_frequency]
+    #print(f"Band #{1}:\tMin:{min_frequency}\tMean:{(min_frequency + min_mat_frequency) / 2}\tMax:{min_mat_frequency}")
+    bands[-1] = [max_mat_frequency, (max_mat_frequency + max_frequency) / 2, max_frequency]
+
+    # Calculate initial band
+    band = max_mat_frequency / (divisions - 1)
+
     # Loop through each band
-    for band_num in range(1, divisions + 1):
+    for band_num in range(1, divisions):
         # Upper ceiling of each band
         band_max = (band * band_num)
 
         # Lower ceiling of each band and handling of edge case
         if band_num == 1:
-            band_min = min_frequency
+            band_min = min_mat_frequency
         else:
             band_min = (band * (band_num - 1))
 
@@ -89,6 +102,11 @@ def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
 
         # Fill up array
         bands[band_num - 1] = [band_min, band_mean, band_max]
+
+        #print(f"Band #{band_num}:\tMin:{band_min}\tMean:{band_mean}\tMax:{band_max}")
+
+    #print(f"Band #n:\tMin:{max_mat_frequency}\tMean:{(max_mat_frequency + max_frequency) / 2}\tMax:{max_frequency}")
+
 
     # We create 6 interpolating functions for each material:
     wall_mat_interp = [interpolate_pair(mat, plot) for mat in params.wall_materials]
