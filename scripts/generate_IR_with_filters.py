@@ -46,7 +46,7 @@ def automatic_gain_increase(source, bit_depth, ceiling):
     max_gain = np.iinfo(bit_depth).max*10**(-ceiling/10)
     factor = max_gain/peak
 
-    return source*factor
+    return source * factor
 
 
 def generate_IR(source, filters, bit_depth, fs, visualize=True):
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     freq_dep_abs_coeff = True
 
     # Wall, floor and ceiling materials the room is consisting of
-    # Structure: Array of six materials (use 'mat.xxx') corresponding to: 
+    # Structure: Array of six materials (use 'mat.xxx') corresponding to:
     # Left wall | Right wall | Front wall | Back wall | Floor | Ceiling
     wall_materials = 6 * [mat.wood_16mm_on_40mm_slats]
 
@@ -116,11 +116,11 @@ if __name__ == "__main__":
         # Attenuation when start using the diffuse reverberation model [dB]
         att_diff = 15.0,
         att_max = 60.0,  # Attenuation at the end of the simulation [dB]
-        fs=44100,  # Sampling frequency [Hz]
+        fs = 44100,  # Sampling frequency [Hz]
         # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
-        bit_depth=np.int32,
+        bit_depth = np.int32,
         # Absorption coefficient of walls, ceiling and floor.
-        wall_materials=wall_materials
+        wall_materials = wall_materials
     )
 
     if freq_dep_abs_coeff:
@@ -134,11 +134,13 @@ if __name__ == "__main__":
 
         filters = [
             # Speaker simulation
-            #LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs),
+            # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs),
+
             # Air absorption simulation
-            #AirAbsBandpass(),
+            # AirAbsBandpass(),
+
             # Mic simulation
-            #CharacteristicFilter(cm.sm57_freq_response, params.fs),
+            # CharacteristicFilter(cm.sm57_freq_response, params.fs),
         ]
 
         generate_IR(receiver_channels[i], filters, params.bit_depth, params.fs)

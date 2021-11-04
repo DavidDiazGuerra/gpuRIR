@@ -17,7 +17,7 @@ class Materials:
         [500, 0.31],
         [1000, 0.29],
         [2000, 0.39],
-        [125, 0.25]
+        [4000, 0.25]
     ])
 
     concrete_coarse_painted = np.array([

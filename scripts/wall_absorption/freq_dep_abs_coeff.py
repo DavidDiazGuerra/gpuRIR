@@ -13,10 +13,6 @@ from multiprocessing import Pool
 
 from generate_RIR import generate_RIR
 
-'''
-abs_weights [6]: Absortion coefficient ratios of the walls
-'''
-
 
 '''
 Interpolates frequency response array with cubic spline method.
