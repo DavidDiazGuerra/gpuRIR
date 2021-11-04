@@ -22,7 +22,7 @@ def interpolate_pair(abs_coeff, plot):
     # x: frequency [Hz]
     y = abs_coeff[:, 1]
     x = abs_coeff[:, 0]
-    f = interp1d(x, y, bounds_error=False, fill_value='extrapolate')
+    f = interp1d(x, y, bounds_error=False, fill_value=(y[0], y[-1]))
     x_interpolated = np.arange(1, 20000)
     y_interpolated = f(x_interpolated)
     if plot:
@@ -30,7 +30,9 @@ def interpolate_pair(abs_coeff, plot):
         plt.plot(x_interpolated, y_interpolated, "-")
     return f
 
-
+'''
+Shows plot of the room frequency response.
+'''
 def show_plot():
     plt.xlim(right=20000)
     plt.legend()

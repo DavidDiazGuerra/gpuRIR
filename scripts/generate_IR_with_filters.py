@@ -135,6 +135,7 @@ if __name__ == "__main__":
         filters = [
             # Speaker simulation
             # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs),
+            # CharacteristicFilter(cm.tiny_speaker)
 
             # Air absorption simulation
             # AirAbsBandpass(),
