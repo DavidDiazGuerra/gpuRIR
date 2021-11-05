@@ -17,6 +17,8 @@ from generate_RIR import generate_RIR
 '''
 Interpolates frequency response array with cubic spline method.
 '''
+
+
 def interpolate_pair(abs_coeff, plot):
     # y: absorption coefficient
     # x: frequency [Hz]
@@ -30,9 +32,12 @@ def interpolate_pair(abs_coeff, plot):
         plt.plot(x_interpolated, y_interpolated, "-")
     return f
 
+
 '''
 Shows plot of the room frequency response.
 '''
+
+
 def show_plot():
     plt.xlim(right=20000)
     plt.legend()
@@ -42,6 +47,8 @@ def show_plot():
 '''
 Returns a butterworth bandpass filter.
 '''
+
+
 def create_bandpass_filter(lowcut, highcut, fs, order=9):
     nyq = 0.5 * fs
     low = (lowcut / nyq)
@@ -53,6 +60,8 @@ def create_bandpass_filter(lowcut, highcut, fs, order=9):
 '''
 Applies a butterworth bandpass filter.
 '''
+
+
 def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
     b, a = create_bandpass_filter(
         lowcut, highcut, fs, order=order)
@@ -62,16 +71,22 @@ def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
 
 '''
 params:             gpuRIR parameters
-divisions:          Count of divisions the frequency spectrum gets divided into
-order:              Where bandpass starts to cut off
+band_width:         Initial width of frequency band. Lower means higher quality but less performant. (recommended: 10)
+factor:             Multiplication factor of frequency band. Lower means higher quality but less performant. (recommended: 1.1)
+order:              Butterworth filter order.
+plot:               Plots the interpolated material frequency response curve.
+verbose:            Prints current band parameters.
 '''
-def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
+
+
+def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot=False, verbose=True):
+    assert(factor > 1), "Factor must be greater than 1!"
+
     min_frequency = 20
     max_frequency = 20000
-    band = max_frequency / divisions
 
     # Structure: min / mean / max
-    bands = np.zeros((divisions, 3))
+    bands = []
 
     # Find out minimum and maximum frequency value of all materials
     material_frequencies = np.vstack(params.wall_materials)[:, 0]
@@ -79,37 +94,44 @@ def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
     max_mat_frequency = np.max(material_frequencies)
 
     # Outside of the material bounds, absorption values are constant. (Not wasting bands)
-    bands[0] = [min_frequency, (min_frequency + min_mat_frequency) / 2, min_mat_frequency]
-    #print(f"Band #{1}:\tMin:{min_frequency}\tMean:{(min_frequency + min_mat_frequency) / 2}\tMax:{min_mat_frequency}")
-    bands[-1] = [max_mat_frequency, (max_mat_frequency + max_frequency) / 2, max_frequency]
+    bands.append(
+        [min_frequency, (min_frequency + min_mat_frequency) / 2, min_mat_frequency])
+    if verbose:
+        print(
+            f"Min:{min_frequency}%%%Mean:{(min_frequency + min_mat_frequency) / 2}%%%Max:{min_mat_frequency}")
 
-    # Calculate initial band
-    band = max_mat_frequency / (divisions - 1)
+    reached_max = False
 
-    # Loop through each band
-    for band_num in range(1, divisions):
-        # Upper ceiling of each band
-        band_max = (band * band_num)
+    current_min = min_mat_frequency
+    current_max = current_min + band_width
+    current_mean = (current_min + current_max) / 2
 
-        # Lower ceiling of each band and handling of edge case
-        if band_num == 1:
-            band_min = min_mat_frequency
-        else:
-            band_min = (band * (band_num - 1))
+    while not reached_max:
+        if current_max > max_mat_frequency:
+            current_max = max_mat_frequency
+            current_mean = (current_min + current_max) / 2
+            reached_max = True
 
-        # Calculating mean frequency of band which determines the attenuation.
-        band_mean = (band_max + band_min) / 2
+        bands.append([current_min, current_mean, current_max])
 
-        # Fill up array
-        bands[band_num - 1] = [band_min, band_mean, band_max]
+        if verbose:
+            print(
+                f"Min:{current_min}%%%Mean:{current_mean}%%%Max:{current_max}%%%Band width:{band_width}")
+        band_width *= factor
 
-        #print(f"Band #{band_num}:\tMin:{band_min}\tMean:{band_mean}\tMax:{band_max}")
+        current_min = current_max
+        current_max = current_min + band_width
+        current_mean = (current_min + current_max) / 2
 
-    #print(f"Band #n:\tMin:{max_mat_frequency}\tMean:{(max_mat_frequency + max_frequency) / 2}\tMax:{max_frequency}")
-
+    bands.append(
+        [max_mat_frequency, (max_mat_frequency + max_frequency) / 2, max_frequency])
+    if verbose:
+        print(
+            f"Min:{max_mat_frequency}%%%Mean:{(max_mat_frequency + max_frequency) / 2}%%%Max:{max_frequency}")
 
     # We create 6 interpolating functions for each material:
-    wall_mat_interp = [interpolate_pair(mat, plot) for mat in params.wall_materials]
+    wall_mat_interp = [interpolate_pair(mat, plot)
+                       for mat in params.wall_materials]
     if plot:
         show_plot()
 
@@ -126,8 +148,8 @@ def generate_RIR_freq_dep_walls(params, divisions=10, order=3, plot=False):
 
         for rcv in range(len(params.pos_rcv)):
             # Bandpass RIR
-            bandpassed = apply_bandpass_filter(RIR[rcv], band[0], band[2], params.fs, order)
-            print(bandpassed)
+            bandpassed = apply_bandpass_filter(
+                RIR[rcv], band[0], band[2], params.fs, order)
             receiver_channels.resize(len(params.pos_rcv), len(bandpassed))
             receiver_channels[rcv] += bandpassed
 
