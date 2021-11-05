@@ -79,7 +79,7 @@ verbose:            Prints current band parameters.
 '''
 
 
-def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot=False, verbose=True):
+def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot=False, verbose=False):
     assert(factor > 1), "Factor must be greater than 1!"
 
     min_frequency = 20
@@ -98,7 +98,7 @@ def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot
         [min_frequency, (min_frequency + min_mat_frequency) / 2, min_mat_frequency])
     if verbose:
         print(
-            f"Min:{min_frequency}%%%Mean:{(min_frequency + min_mat_frequency) / 2}%%%Max:{min_mat_frequency}")
+            f"Min:{min_frequency}\tMean:{(min_frequency + min_mat_frequency) / 2}\tMax:{min_mat_frequency}")
 
     reached_max = False
 
@@ -116,7 +116,7 @@ def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot
 
         if verbose:
             print(
-                f"Min:{current_min}%%%Mean:{current_mean}%%%Max:{current_max}%%%Band width:{band_width}")
+                f"Min:{current_min}\tMean:{current_mean}\tMax:{current_max}\tBand width:{band_width}")
         band_width *= factor
 
         current_min = current_max
@@ -127,7 +127,7 @@ def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot
         [max_mat_frequency, (max_mat_frequency + max_frequency) / 2, max_frequency])
     if verbose:
         print(
-            f"Min:{max_mat_frequency}%%%Mean:{(max_mat_frequency + max_frequency) / 2}%%%Max:{max_frequency}")
+            f"Min:{max_mat_frequency}\tMean:{(max_mat_frequency + max_frequency) / 2}\tMax:{max_frequency}")
 
     # We create 6 interpolating functions for each material:
     wall_mat_interp = [interpolate_pair(mat, plot)
