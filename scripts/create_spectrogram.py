@@ -18,7 +18,7 @@ def create_spectrogram(inner_file_path, title=""):
     plt.colorbar(label='dB').ax.yaxis.set_label_position('left')
     plt.show()
 
-
+    
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
     if len(sys.argv) > 2:

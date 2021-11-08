@@ -6,6 +6,7 @@ from scipy.signal import butter, lfilter, filtfilt
 import multiprocessing
 from multiprocessing import Pool
 
+
 class AirAbsBandpass(FilterStrategy):
     def __init__(self, max_frequency=20000, min_frequency=1, divisions=50, fs=44100):
         self.max_frequency = max_frequency
@@ -38,9 +39,10 @@ class AirAbsBandpass(FilterStrategy):
     '''
     @staticmethod
     def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
-        b, a = AirAbsBandpass.create_bandpass_filter(lowcut, highcut, fs, order=order)
+        b, a = AirAbsBandpass.create_bandpass_filter(
+            lowcut, highcut, fs, order=order)
         y = lfilter(b, a, data)     # Single Filter
-        #y = filtfilt(b, a, data)   # Forward and backward filtering
+        # y = filtfilt(b, a, data)   # Forward and backward filtering
         return y
 
     def apply_single_band(self, IR, band_num, frequency_range):
@@ -76,6 +78,7 @@ class AirAbsBandpass(FilterStrategy):
     '''
     Creates a multi processing pool and calls methods to apply bandpass based air absorption.
     '''
+
     def air_absorption_bandpass(self, IR):
         pool = multiprocessing.Pool()
 
