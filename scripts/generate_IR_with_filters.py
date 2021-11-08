@@ -101,7 +101,7 @@ if __name__ == "__main__":
     # Wall, floor and ceiling materials the room is consisting of
     # Structure: Array of six materials (use 'mat.xxx') corresponding to:
     # Left wall | Right wall | Front wall | Back wall | Floor | Ceiling
-    wall_materials = 6 * [mat.wood_16mm_on_40mm_slats]
+    wall_materials = 4 * [mat.wallpaper_on_lime_cement_plaster] + [mat.parquet_glued] + [mat.concrete]
 
     # Define room parameters
     params = rp.RoomParameters(

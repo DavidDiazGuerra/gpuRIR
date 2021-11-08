@@ -13,7 +13,6 @@ from multiprocessing import Pool
 
 from generate_RIR import generate_RIR
 
-
 '''
 Interpolates frequency response array with cubic spline method.
 '''
@@ -79,7 +78,7 @@ verbose:            Prints current band parameters.
 '''
 
 
-def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot=False, verbose=False):
+def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=3, plot=False, verbose=True):
     assert(factor > 1), "Factor must be greater than 1!"
 
     min_frequency = 20
@@ -108,8 +107,6 @@ def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot
 
     while not reached_max:
         if current_max > max_mat_frequency:
-            current_max = max_mat_frequency
-            current_mean = (current_min + current_max) / 2
             reached_max = True
 
         bands.append([current_min, current_mean, current_max])
@@ -124,10 +121,10 @@ def generate_RIR_freq_dep_walls(params, band_width=10, factor=1.1, order=3, plot
         current_mean = (current_min + current_max) / 2
 
     bands.append(
-        [max_mat_frequency, (max_mat_frequency + max_frequency) / 2, max_frequency])
+        [current_min, (current_min + max_frequency) / 2, max_frequency])
     if verbose:
         print(
-            f"Min:{max_mat_frequency}\tMean:{(max_mat_frequency + max_frequency) / 2}\tMax:{max_frequency}")
+            f"Min:{current_min}\tMean:{(current_min + max_frequency) / 2}\tMax:{max_frequency}")
 
     # We create 6 interpolating functions for each material:
     wall_mat_interp = [interpolate_pair(mat, plot)
