@@ -61,16 +61,20 @@ Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM). Fo
         RIRs sampling frequency (in Hertz).
 * **Tdiff** : *float, optional*
         Time (in seconds) when the ISM is replaced by a diffuse reverberation model. Default is Tmax (full ISM simulation).
+* **spkr_pattern** : *{"omni", "homni", "card", "hypcard", "subcard", "bidir"}, optional.*
+        Polar pattern of the sources (the same for all of them).
 * **mic_pattern** : *{"omni", "homni", "card", "hypcard", "subcard", "bidir"}, optional.*
-        Polar pattern of the receivers (the same for all of them).
+	Polar pattern of the receivers (the same for all of them).
 	* *"omni"* : Omnidireccional (default).
 	* *"homni"*: Half omnidireccional, 1 in front of the microphone, 0 backwards.
 	* *"card"*: Cardioid.
 	* *"hypcard"*: Hypercardioid.
 	* *"subcard"*: Subcardioid.
 	* *"bidir"*: Bidirectional, a.k.a. figure 8.
+* **orV_src** : *ndarray with 2 dimensions and 3 columns or None, optional.*
+        Orientation of the sources as vectors pointing in the same direction. Applies to each source. None (default) is only valid for omnidirectional patterns.
 * **orV_rcv** : *ndarray with 2 dimensions and 3 columns or None, optional.*
-        Orientation of the receivers as vectors pointing in the same direction. None (default) is only valid for omnidireccional patterns.
+        Orientation of the receivers as vectors pointing in the same direction. Applies to each receiver. None (default) is only valid for omnidirectional patterns.
 * **c** : *float, optional.*
         Speed of sound (in m/s). The default is 343.0.
 
