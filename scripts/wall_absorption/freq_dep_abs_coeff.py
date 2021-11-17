@@ -90,7 +90,7 @@ LR:                 Uses Linkwitz-Riley filtering. LR filter order is a double o
 plot:               Plots the interpolated material frequency response curve.
 verbose:            Prints current band parameters.
 '''
-def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=True, plot=False, verbose=True):
+def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=True, plot=False, verbose=False):
     assert(factor > 1), "Factor must be greater than 1!"
 
     min_frequency = 1
@@ -143,6 +143,7 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=
 
     for i in range(len(bands)):
         band = bands[i]
+        print(band[0])
         abs_coeffs = np.zeros(len(wall_mat_interp))
         for j in range(len(wall_mat_interp)):
             abs_coeffs[j] = wall_mat_interp[j](band[1])
@@ -153,7 +154,6 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=
         # Apply band/lowpassing and re-compiling sound data
         for rcv in range(len(params.pos_rcv)):          
             # Lowpass lowest frequency band
-            print(f"i = {i}")
             if i == 0:
                 processed = apply_pass_filter(
                     RIR[rcv], band[2], params.fs, 'lowpass', order

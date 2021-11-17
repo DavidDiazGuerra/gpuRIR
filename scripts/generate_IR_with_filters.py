@@ -94,35 +94,36 @@ def generate_IR(source, filters, bit_depth, fs, visualize=True):
 
 
 if __name__ == "__main__":
-    # If True, apply frequency dependent wall absorption coefficients to simulate realistic wall/ceiling/floor materials
-    # Needs more resources!
-    freq_dep_abs_coeff = True
+    # If True, apply frequency dependent wall absorption coefficients to simulate realistic wall/ceiling/floor materials.
+    # Caution: Needs more resources!
+    freq_dep_abs_coeff = False
 
     # Wall, floor and ceiling materials the room is consisting of
     # Structure: Array of six materials (use 'mat.xxx') corresponding to:
     # Left wall | Right wall | Front wall | Back wall | Floor | Ceiling
-    wall_materials = 6 * [mat.absorb_low_freqs]
+    wall_materials = 4 * [mat.wallpaper_on_lime_cement_plaster] + [mat.parquet_glued] + [mat.concrete]
 
     # Define room parameters
     params = rp.RoomParameters(
-        room_sz = [5, 4, 3],  # Size of the room [m]
-        pos_src = [[1, 1, 1.6]],  # Positions of the sources ([m]
-        pos_rcv = [[4, 3, 1.6]],  # Positions of the receivers [m]
-        orV_src = [0, -1, 0],  # Steering vector of source
-        orV_rcv = [0, 1, 0],  # Steering vector of receiver
-        spkr_pattern = "omni",  # Source polar pattern
-        mic_pattern = "card",  # Receiver polar pattern
-        T60 = 1.0,  # Time for the RIR to reach 60dB of attenuation [s]
+        room_sz=[5, 4, 3],  # Size of the room [m]
+        pos_src=[[1, 1, 1.6]],  # Positions of the sources [m]
+        pos_rcv=[[4, 3, 1.6]],  # Positions of the receivers [m]
+        orV_src=[0, -1, 0],  # Steering vector of source(s)
+        orV_rcv=[0, 1, 0],  # Steering vector of receiver(s)
+        spkr_pattern="omni",  # Source polar pattern
+        mic_pattern="card",  # Receiver polar pattern
+        T60=1.0,  # Time for the RIR to reach 60dB of attenuation [s]
         # Attenuation when start using the diffuse reverberation model [dB]
-        att_diff = 15.0,
-        att_max = 60.0,  # Attenuation at the end of the simulation [dB]
-        fs = 44100,  # Sampling frequency [Hz]
+        att_diff=15.0,
+        att_max=60.0,  # Attenuation at the end of the simulation [dB]
+        fs=44100,  # Sampling frequency [Hz]
         # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
-        bit_depth = np.int32,
+        bit_depth=np.int32,
         # Absorption coefficient of walls, ceiling and floor.
-        wall_materials = wall_materials
+        wall_materials=wall_materials
     )
 
+    # Generate room impulse response (RIR) with given parameters
     if freq_dep_abs_coeff:
         receiver_channels = fdac.generate_RIR_freq_dep_walls(params)
     else:
@@ -133,15 +134,20 @@ if __name__ == "__main__":
         # Leave filters array empty if no filters should be applied.
 
         filters = [
-            # Speaker simulation
-            # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs),
+            # Speaker simulation. 
+            # Comment either one out
             # CharacteristicFilter(cm.tiny_speaker)
+            # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs)
 
-            # Air absorption simulation
+            # Air absorption simulation. 
+            # Comment either one out
             # AirAbsBandpass(),
+            # AirAbsSTFT()
 
-            # Mic simulation
-            # CharacteristicFilter(cm.sm57_freq_response, params.fs),
+            # Mic simulation. 
+            # Comment either one out
+            # CharacteristicFilter(cm.sm57_freq_response, params.fs)
+            # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs)
         ]
 
         generate_IR(receiver_channels[i], filters, params.bit_depth, params.fs)
