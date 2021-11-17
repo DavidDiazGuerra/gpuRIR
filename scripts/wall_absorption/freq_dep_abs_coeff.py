@@ -73,12 +73,13 @@ params:             gpuRIR parameters
 band_width:         Initial width of frequency band. Lower means higher quality but less performant. (recommended: 10)
 factor:             Multiplication factor of frequency band. Lower means higher quality but less performant. (recommended: 1.1)
 order:              Butterworth filter order.
+LR:                 Uses Linkwitz-Riley filtering. LR filter order is a double of order parameter (e.g. order = 2 -> LR order = 4)
 plot:               Plots the interpolated material frequency response curve.
 verbose:            Prints current band parameters.
 '''
 
 
-def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=3, plot=False, verbose=True):
+def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=True, plot=False, verbose=True):
     assert(factor > 1), "Factor must be greater than 1!"
 
     min_frequency = 20
@@ -147,6 +148,10 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=3, plo
             # Bandpass RIR
             bandpassed = apply_bandpass_filter(
                 RIR[rcv], band[0], band[2], params.fs, order)
+            if LR:
+                bandpassed = apply_bandpass_filter(
+                    bandpassed, band[0], band[2], params.fs, order)
+
             receiver_channels.resize(len(params.pos_rcv), len(bandpassed))
             receiver_channels[rcv] += bandpassed
 
