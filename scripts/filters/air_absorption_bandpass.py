@@ -8,11 +8,12 @@ from multiprocessing import Pool
 
 
 class AirAbsBandpass(FilterStrategy):
-    def __init__(self, max_frequency=20000, min_frequency=1, divisions=50, fs=44100):
+    def __init__(self, max_frequency=20000, min_frequency=1, divisions=50, fs=44100, order=3):
         self.max_frequency = max_frequency
         self.min_frequency = min_frequency
         self.divisions = divisions
         self.fs = fs
+        self.order = order
         self.NAME = "bandpass_air_abs"
 
     '''
@@ -27,7 +28,7 @@ class AirAbsBandpass(FilterStrategy):
     Returns a butterworth bandpass filter.
     '''
     @staticmethod
-    def create_bandpass_filter(lowcut, highcut, fs, order=10):
+    def create_bandpass_filter(lowcut, highcut, fs, order):
         nyq = 0.5 * fs
         low = (lowcut / nyq)
         high = highcut / nyq
@@ -38,11 +39,30 @@ class AirAbsBandpass(FilterStrategy):
     Applies a butterworth bandpass filter.
     '''
     @staticmethod
-    def apply_bandpass_filter(data, lowcut, highcut, fs, order=10):
+    def apply_bandpass_filter(data, lowcut, highcut, fs, order):
         b, a = AirAbsBandpass.create_bandpass_filter(
-            lowcut, highcut, fs, order=order)
+            lowcut, highcut, fs, order)
         y = lfilter(b, a, data)     # Single Filter
-        # y = filtfilt(b, a, data)   # Forward and backward filtering
+        return y
+
+    '''
+    Returns a butterworth lowpass filter.
+    '''
+    @staticmethod
+    def create_pass_filter(cut, fs, pass_type, order=3):
+        nyq = 0.5 * fs
+        pass_value = cut / nyq
+        b, a = butter(order, pass_value, btype=pass_type)
+        return b, a
+
+    '''
+    Applies a butterworth lowpass filter.
+    '''
+    @staticmethod
+    def apply_pass_filter(data, cut, fs, pass_type, order=3):
+        b, a = AirAbsBandpass.create_pass_filter(
+            cut, fs, pass_type, order=order)
+        y = lfilter(b, a, data)     # Single Filter
         return y
 
     def apply_single_band(self, IR, band_num, frequency_range):
@@ -61,8 +81,17 @@ class AirAbsBandpass(FilterStrategy):
         band_mean = (band_max + band_min) / 2
 
         # Prepare + apply bandpass filter
-        filtered_signal = self.apply_bandpass_filter(
-            IR, band_min, band_max, self.fs, 3)
+        if band_num == 1:
+            filtered_signal = self.apply_pass_filter(
+                IR, band_max, self.fs, 'lowpass', self.order
+            )
+        elif band_num == self.divisions:
+            filtered_signal = self.apply_pass_filter(
+                IR, band_min, self.fs, 'highpass', self.order
+            )
+        else:
+            filtered_signal = self.apply_bandpass_filter(
+                IR, band_min, band_max, self.fs, self.order)
 
         # Calculate air absorption coefficients
         alpha, _, c, _ = air_absorption(band_mean)
