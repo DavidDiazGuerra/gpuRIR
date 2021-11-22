@@ -130,6 +130,8 @@ if __name__ == "__main__":
     # Caution: Needs more resources!
     freq_dep_abs_coeff = False
 
+    visualize = True
+
     # Wall, floor and ceiling materials the room is consisting of
     # Structure: Array of six materials (use 'mat.xxx') corresponding to:
     # Left wall | Right wall | Front wall | Back wall | Floor | Ceiling
@@ -137,18 +139,18 @@ if __name__ == "__main__":
 
     # Parameters referring to head related transfer functions (HRTF).
     head_width = 0.1449  # [m]
-    head_position = [3, 2, 1]
-    head_direction = [0, 1, 0]
+    head_position = [1, 1, 1.2]
+    head_direction = [1, 1, 0]
 
     ear_direction_r = rotate_xy_plane(head_direction, np.pi/2)
-    ear_direction_l = -ear_direction_r
+    ear_direction_l = rotate_xy_plane(head_direction, -np.pi/2)
 
     ear_position_r = (head_position + ear_direction_r * (head_width / 2))
     ear_position_l = (head_position + ear_direction_l * (head_width / 2))
 
     # Common gpuRIR parameters (applied to both channels)
     room_sz = [5, 4, 3]  # Size of the room [m]
-    pos_src = [[1, 1, 1.6]]  # Positions of the sources [m]
+    pos_src = [[3, 1.5, 1.6]]  # Positions of the sources [m]
     orV_src = [0, -1, 0]  # Steering vector of source(s)
     spkr_pattern = "omni"  # Source polar pattern
     mic_pattern = "homni"  # Receiver polar pattern
@@ -160,6 +162,32 @@ if __name__ == "__main__":
     # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
     bit_depth = np.int32
 
+    if visualize:
+            ax = plt.figure().add_subplot(projection='3d')
+            x, y, z = np.meshgrid(
+                np.arange(0, room_sz[0], 0.2), 
+                np.arange(0, room_sz[1], 0.2), 
+                np.arange(0, room_sz[2], 0.2)
+            )
+
+            # Plot origin
+            ax.quiver(0, 0, 0, head_position[0], head_position[1], head_position[2], arrow_length_ratio=0, color='gray', label="Head position")
+            
+            # Plot ear directions
+            ax.quiver(head_position[0], head_position[1], head_position[2], ear_direction_l[0], ear_direction_l[1], ear_direction_l[2], length=head_width/2, color='b', label="Left ear direction")
+            ax.quiver(head_position[0], head_position[1], head_position[2], ear_direction_r[0], ear_direction_r[1], ear_direction_r[2], length=head_width/2, color='r', label="Right ear direction")
+            
+            # Plot head direction
+            ax.quiver(head_position[0], head_position[1], head_position[2], head_direction[0], head_direction[1], head_direction[2], length=0.2, color='orange', label="Head direction")
+
+            # Plot signal source
+            ax.quiver(head_position[0], head_position[1], head_position[2], pos_src[0][0] - head_position[0], pos_src[0][1] - head_position[1], pos_src[0][2] - head_position[2], arrow_length_ratio=0.1, color='g', label="Signal source")
+
+            plt.legend()
+            plt.show()
+
+
+            
     # Define room parameters
     params_left = rp.RoomParameters(
         room_sz=room_sz, 
