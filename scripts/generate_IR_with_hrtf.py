@@ -124,6 +124,17 @@ def rotate_xy_plane(vec, angle):
     return vec
 
 
+def rotate_z_plane(vec, angle):
+    vec_copy = np.copy(vec)
+    
+    z_rotation = np.array([
+        [np.cos(angle), -np.sin(angle), 0],
+        [np.sin(angle),  np.cos(angle), 0],
+        [0,              0,             1]
+    ])
+    vec_copy[2] = 0
+    return vec_copy @ z_rotation
+
 
 if __name__ == "__main__":
     # If True, apply frequency dependent wall absorption coefficients to simulate realistic wall/ceiling/floor materials.
@@ -139,18 +150,18 @@ if __name__ == "__main__":
 
     # Parameters referring to head related transfer functions (HRTF).
     head_width = 0.1449  # [m]
-    head_position = [1, 1, 1.2]
+    head_position = [1, 1, 1.6]
     head_direction = [1, 1, 0]
 
-    ear_direction_r = rotate_xy_plane(head_direction, np.pi/2)
-    ear_direction_l = rotate_xy_plane(head_direction, -np.pi/2)
+    ear_direction_r = rotate_z_plane(head_direction, np.pi/2)
+    ear_direction_l = -ear_direction_r
 
     ear_position_r = (head_position + ear_direction_r * (head_width / 2))
     ear_position_l = (head_position + ear_direction_l * (head_width / 2))
 
     # Common gpuRIR parameters (applied to both channels)
     room_sz = [5, 4, 3]  # Size of the room [m]
-    pos_src = [[3, 1.5, 1.6]]  # Positions of the sources [m]
+    pos_src = [[3, 1.5, 0.6]]  # Positions of the sources [m]
     orV_src = [0, -1, 0]  # Steering vector of source(s)
     spkr_pattern = "omni"  # Source polar pattern
     mic_pattern = "homni"  # Receiver polar pattern
@@ -170,7 +181,7 @@ if __name__ == "__main__":
                 np.arange(0, room_sz[2], 0.2)
             )
 
-            # Plot origin
+            # Plot origin -> head position
             ax.quiver(0, 0, 0, head_position[0], head_position[1], head_position[2], arrow_length_ratio=0, color='gray', label="Head position")
             
             # Plot ear directions
@@ -180,8 +191,11 @@ if __name__ == "__main__":
             # Plot head direction
             ax.quiver(head_position[0], head_position[1], head_position[2], head_direction[0], head_direction[1], head_direction[2], length=0.2, color='orange', label="Head direction")
 
-            # Plot signal source
+            # Plot head -> signal source
             ax.quiver(head_position[0], head_position[1], head_position[2], pos_src[0][0] - head_position[0], pos_src[0][1] - head_position[1], pos_src[0][2] - head_position[2], arrow_length_ratio=0.1, color='g', label="Signal source")
+
+            # Plot elevation + azimuth
+            # Elevation = 0.1868233007402613 Azimuth = 2.1527469921440656
 
             plt.legend()
             plt.show()
