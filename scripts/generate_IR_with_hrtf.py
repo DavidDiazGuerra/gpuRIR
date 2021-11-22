@@ -15,6 +15,8 @@ import filters.air_absorption_calculation as aa
 from wall_absorption.materials import Materials as mat
 import wall_absorption.freq_dep_abs_coeff as fdac
 
+from filters.hrtf_filter import HRTF_Filter
+
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -49,7 +51,7 @@ def automatic_gain_increase(source, bit_depth, ceiling):
     return source * factor
 
 
-def generate_stereo_IR(source_r, source_l, filters, bit_depth, fs, visualize=True):
+def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, visualize=True):
     '''
     Generates an IR file out of given source sound data and an optional array of filters to be applied.
 
@@ -62,13 +64,20 @@ def generate_stereo_IR(source_r, source_l, filters, bit_depth, fs, visualize=Tru
     filename_appendix = ""
 
     # Apply filters for both stereo channels
-    for i in range(len(filters)):
+    for i in range(len(filters_r)):
         start_time = time.time()
-        source_signal_r = Filter(filters[i]).apply(source_signal_r)
-        source_signal_l = Filter(filters[i]).apply(source_signal_l)
+        source_signal_r = Filter(filters_r[i]).apply(source_signal_r)
         end_time = time.time()
-        print(f"{filters[i].NAME} time = {end_time-start_time} seconds")
-        filename_appendix = f"{filename_appendix}_{filters[i].NAME}"
+        print(f"{filters_r[i].NAME} time = {end_time-start_time} seconds")
+        filename_appendix = f"{filename_appendix}_{filters_r[i].NAME}"
+
+    for i in range(len(filters_l)):
+        start_time = time.time()
+        source_signal_l = Filter(filters_l[i]).apply(source_signal_l)
+        end_time = time.time()
+        print(f"{filters_l[i].NAME} time = {end_time-start_time} seconds")
+        filename_appendix = f"{filename_appendix}_{filters_l[i].NAME}"
+
 
     # Stack array vertically
     ir_array_r = np.vstack(source_signal_r)
@@ -115,15 +124,6 @@ def rotate_xy_plane(vec, angle):
     return vec
 
 
-'''    
-a=[1,1,1] # head posish
-b=[0,1,0] # steering vector
-
-r=rotate_xy_plane(b, np.pi/2)
-l=-r
-print(f"l=\n{l}")
-print(f"r=\n{r}")
-'''
 
 if __name__ == "__main__":
     # If True, apply frequency dependent wall absorption coefficients to simulate realistic wall/ceiling/floor materials.
@@ -133,9 +133,7 @@ if __name__ == "__main__":
     # Wall, floor and ceiling materials the room is consisting of
     # Structure: Array of six materials (use 'mat.xxx') corresponding to:
     # Left wall | Right wall | Front wall | Back wall | Floor | Ceiling
-    wall_materials = 4 * \
-        [mat.wallpaper_on_lime_cement_plaster] + \
-        [mat.parquet_glued] + [mat.concrete]
+    wall_materials = 5 * [0.6] + [0.1]
 
     # Parameters referring to head related transfer functions (HRTF).
     head_width = 0.1449  # [m]
@@ -148,47 +146,53 @@ if __name__ == "__main__":
     ear_position_r = (head_position + ear_direction_r * (head_width / 2))
     ear_position_l = (head_position + ear_direction_l * (head_width / 2))
 
-    print(f"ear_direction_r = \n{ear_direction_r}")
-    print(f"ear_direction_l = \n{ear_direction_l}")
-
-    print(f"ear_position_r = \n{ear_position_r}")
-    print(f"ear_position_l = \n{ear_position_l}")
-
-    # Common gpuRIR parameters
-    room_sz = [5, 4, 3],  # Size of the room [m]
-    pos_src = [[1, 1, 1.6]],  # Positions of the sources [m]
-    orV_src = [0, -1, 0],  # Steering vector of source(s)
-    spkr_pattern = "omni",  # Source polar pattern
-    mic_pattern = "homni",  # Receiver polar pattern
-    T60 = 1.0,  # Time for the RIR to reach 60dB of attenuation [s]
+    # Common gpuRIR parameters (applied to both channels)
+    room_sz = [5, 4, 3]  # Size of the room [m]
+    pos_src = [[1, 1, 1.6]]  # Positions of the sources [m]
+    orV_src = [0, -1, 0]  # Steering vector of source(s)
+    spkr_pattern = "omni"  # Source polar pattern
+    mic_pattern = "homni"  # Receiver polar pattern
+    T60 = 1.0  # Time for the RIR to reach 60dB of attenuation [s]
     # Attenuation when start using the diffuse reverberation model [dB]
-    att_diff = 15.0,
-    att_max = 60.0,  # Attenuation at the end of the simulation [dB]
-    fs = 44100,  # Sampling frequency [Hz]
+    att_diff = 15.0
+    att_max = 60.0  # Attenuation at the end of the simulation [dB]
+    fs = 44100  # Sampling frequency [Hz]
     # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
-    bit_depth = np.int32,
-    # Absorption coefficient of walls, ceiling and floor.
-    wall_materials = wall_materials
+    bit_depth = np.int32
 
     # Define room parameters
     params_left = rp.RoomParameters(
-        room_sz=room_sz, pos_src=pos_src, orV_src=orV_src, spkr_pattern=spkr_pattern,
-        mic_pattern=mic_pattern, T60=T60, att_diff=att_diff, att_max=att_max, fs=fs,
-        bit_depth=bit_depth, wall_materials=wall_materials,
+        room_sz=room_sz, 
+        pos_src=pos_src, 
+        orV_src=orV_src, 
+        spkr_pattern=spkr_pattern,
+        mic_pattern=mic_pattern, 
+        T60=T60, 
+        att_diff=att_diff, 
+        att_max=att_max, 
+        fs=fs,
+        bit_depth=bit_depth,
 
         # Positions of the receivers [m]
         pos_rcv=[ear_position_l],  # Position of left ear
-        orV_rcv=ear_direction_l,  # Steering vector of left ear
+        orV_rcv=ear_direction_l  # Steering vector of left ear
     )
 
     params_right = rp.RoomParameters(
-        room_sz=room_sz, pos_src=pos_src, orV_src=orV_src, spkr_pattern=spkr_pattern,
-        mic_pattern=mic_pattern, T60=T60, att_diff=att_diff, att_max=att_max, fs=fs,
-        bit_depth=bit_depth, wall_materials=wall_materials,
+        room_sz=room_sz, 
+        pos_src=pos_src, 
+        orV_src=orV_src, 
+        spkr_pattern=spkr_pattern,
+        mic_pattern=mic_pattern, 
+        T60=T60, 
+        att_diff=att_diff, 
+        att_max=att_max, 
+        fs=fs,
+        bit_depth=bit_depth,
 
         # Positions of the receivers [m]
         pos_rcv=[ear_position_r],  # Position of right ear
-        orV_rcv=ear_direction_r,  # Steering vector of right ear
+        orV_rcv=ear_direction_r  # Steering vector of right ear
     )
 
     # Generate two room impulse responses (RIR) with given parameters for each ear
@@ -202,25 +206,15 @@ if __name__ == "__main__":
 
     # All listed filters wil be applied in that order.
     # Leave filters array empty if no filters should be applied.
-
-    filters = [
-        # Speaker simulation.
-        # Comment either one out
-        # CharacteristicFilter(cm.tiny_speaker)
-        # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs)
-
-        # Air absorption simulation.
-        # Comment either one out
-        # AirAbsBandpass(),
-        # AirAbsSTFT()
-
-        # Mic simulation.
-        # Comment either one out
-        # CharacteristicFilter(cm.sm57_freq_response, params.fs)
-        # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs)
+    filters_both = [
+        # Watch me whip, watch me nae nae
     ]
 
-    generate_stereo_IR(receiver_channel_r, receiver_channel_l, filters, bit_depth, fs)
+    filters_r = filters_both + [HRTF_Filter('r', params_right)]
+    filters_l = filters_both + [HRTF_Filter('l', params_left)]
+
+
+    generate_stereo_IR(receiver_channel_r, receiver_channel_l, filters_r, filters_l, bit_depth, fs)
 
 
     

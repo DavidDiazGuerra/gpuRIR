@@ -54,16 +54,23 @@ class HRTF_Filter(FilterStrategy):
         headdir_xy = [rcv_orV[0], rcv_orV[1]]  # Extract 2D array from 3D
         return HRTF_Filter.find_angle(headdir_xy, head_to_src)
 
+
     def hrtf_convolve(self, IR):
         elevation = self.calculate_elevation(
-            self.params.pos_src, self.params.pos_rcv, self.params.orV_rcv)
+            self.params.pos_src[0], self.params.pos_rcv[0], self.params.orV_rcv[0])
 
         azimuth = self.calculate_azimuth(
-            self.params.pos_src, self.params.pos_rcv, self.params.orV_rcv)
+            self.params.pos_src[0], self.params.pos_rcv[0], self.params.orV_rcv[0])
 
         hrir_channel = self.hrtf_rir.get_hrtf_rir(
             elevation, azimuth, self.channel)
-        return np.convolve(IR, hrir_channel, mode='same')
+
+        print(f"HRIR CHANNEL: \n{hrir_channel}")
+        print(f"IR CHANNEL: \n{IR}")
+
+
+        return np.convolve(IR[0], hrir_channel, mode='same')
+
 
     def apply(self, IR):
         return self.hrtf_convolve(IR)
