@@ -59,12 +59,12 @@ class HRTF_Filter(FilterStrategy):
         elevation = self.calculate_elevation(
             self.params.pos_src[0], self.params.pos_rcv[0], self.params.orV_rcv[0])
 
-        print(f"Elevation = {elevation * (180 / np.pi)}")
+        # print(f"Elevation = {elevation * (180 / np.pi)}")
 
         azimuth = self.calculate_azimuth(
             self.params.pos_src[0], self.params.pos_rcv[0], self.params.orV_rcv[0])
 
-        print(f"Azimuth = {azimuth * (180 / np.pi)}")
+        # print(f"Azimuth = {azimuth * (180 / np.pi)}")
 
         hrir_channel = self.hrtf_rir.get_hrtf_rir(
             elevation, azimuth, self.channel)

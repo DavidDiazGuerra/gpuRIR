@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 from scipy.io import wavfile
 import time
-from create_spectrogram import create_spectrogram
+from create_spectrogram import create_spectrogram_from_file
 
 import room_parameters as rp
 from generate_RIR import generate_RIR
@@ -85,7 +85,7 @@ def generate_IR(source, filters, bit_depth, fs, visualize=True):
 
     if visualize:
         # Create spectrogram
-        create_spectrogram(filename, filename_appendix)
+        create_spectrogram_from_file(filename, filename_appendix)
 
         # Visualize waveform of IR
         # plt.title(filename_appendix)
@@ -96,7 +96,7 @@ def generate_IR(source, filters, bit_depth, fs, visualize=True):
 if __name__ == "__main__":
     # If True, apply frequency dependent wall absorption coefficients to simulate realistic wall/ceiling/floor materials.
     # Caution: Needs more resources!
-    freq_dep_abs_coeff = False
+    freq_dep_abs_coeff = True
 
     # Wall, floor and ceiling materials the room is consisting of
     # Structure: Array of six materials (use 'mat.xxx') corresponding to:
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
     # Generate room impulse response (RIR) with given parameters
     if freq_dep_abs_coeff:
-        receiver_channels = fdac.generate_RIR_freq_dep_walls(params)
+        receiver_channels = fdac.generate_RIR_freq_dep_walls(params, LR=True, order=4, band_width=100, factor=1.5)
     else:
         receiver_channels = generate_RIR(params)
 
@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
             # Air absorption simulation. 
             # Comment either one out
-            # AirAbsBandpass(),
+            AirAbsBandpass(),
             # AirAbsSTFT()
 
             # Mic simulation. 
