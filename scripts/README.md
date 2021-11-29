@@ -1,7 +1,7 @@
 # Generate IR with filters
 
-**generate_IR_with_filters** is a script to generate room impulse response (RIRs) files, ready to be used to convolve audio files.
-Also provided are filters and features which add further functionalities to RIR generation. Aforementioned filters are passed as an array, and are applied in an user-defined order.
+`generate_IR_with_filters` is a script to generate room impulse response (RIRs) files, ready to be used to convolve audio files.
+Also provided are filters and features which add further functionalities to RIR generation. Goal of those features are achieving the most realistic reverb quality possible, add sonic flexibility, yet striking a balance with performance to increase gpuRIR's attractiveness to machine learning applications such as de-reverberation.
 
 # Features
 ## Frequency dependent absorption coefficients
@@ -46,7 +46,7 @@ Applying air absorption using bandpass or STFT (Short Time Fourier Transformatio
 
 ## CharacteristicFilter: Source and receiver characteristics
 Allows the simulation of microphone and speaker frequency responses, for example using a small bluetooth speaker as a source and a phone microphone as the receiver. 
-Uses 1D interpolation to create models, and STFT (Short Time Fourier Transformation) to apply the modelled and interpolated characteristics (defined in `*filters/characteristic_models.py*`). More microphone and speaker models can be defined in `filters/characteristic_models.py` by translating a standard frequency response graph into an array.
+Uses 1D interpolation to create models, and STFT (Short Time Fourier Transformation) to apply the modelled and interpolated characteristics (defined in `filters/characteristic_models.py`). More microphone and speaker models can be defined in `filters/characteristic_models.py` by translating a standard frequency response graph into an array.
 
 ### Parameters
 * **model** Model of speaker/microphone (defined in *filters/characteristic_models.py*)
