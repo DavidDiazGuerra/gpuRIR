@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 class LinearFilter(FilterStrategy):
     
-    def __init__(self, numtabs, bands, desired, fs, plot=False):
-        self.numtabs=numtabs
+    def __init__(self, numtaps, bands, desired, fs, plot=False):
+        self.numtaps=numtaps
         self.bands = bands
         self.desired = desired
         self.fs = fs
@@ -18,7 +18,7 @@ class LinearFilter(FilterStrategy):
     Applies a linear filter.
     '''
     def apply_linear_filter(self, data):
-        b_siumulated_mic = scipy.signal.firls(self.numtabs, self.bands, self.desired, fs=self.fs)  # design filter
+        b_siumulated_mic = scipy.signal.firls(self.numtaps, self.bands, self.desired, fs=self.fs)  # design filter
 
         if self.plot:
             # Plot frequency resonse of filter

@@ -91,7 +91,11 @@ plot:               Plots the interpolated material frequency response curve.
 verbose:            Prints current band parameters.
 '''
 def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=True, plot=False, verbose=False):
+    assert(band_width > 1), "Band width must be greater than 1!"
     assert(factor > 1), "Factor must be greater than 1!"
+
+    if LR:
+        order = order / 2
 
     min_frequency = 1
     max_frequency = 20000
