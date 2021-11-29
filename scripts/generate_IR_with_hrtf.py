@@ -156,14 +156,19 @@ if __name__ == "__main__":
 
     # Parameters referring to head related transfer functions (HRTF).
     head_width = 0.1449  # [m]
-    head_position = [2, 2, 1.6]
-    head_direction = [0.1, 1, 0]
+    head_position = [1.5, 1.5, 1.6] # [m]
+    head_direction = [0.1, 1, 0] # [m]
+
+    pinna_offset_down = 0.0303 # [m]
+    pinna_offset_back = 0.0046 # [m]
 
     ear_direction_r = np.round(rotate_z_plane(head_direction, np.pi/2))
     ear_direction_l = -ear_direction_r
 
-    ear_position_r = (head_position + ear_direction_r * (head_width / 2))
-    ear_position_l = (head_position + ear_direction_l * (head_width / 2))
+    ear_offset_vector = pinna_offset_back * (head_direction / np.linalg.norm(head_direction, 2))
+
+    ear_position_r = (head_position + ear_direction_r * (head_width / 2)) - np.array([0, 0, pinna_offset_down]) - ear_offset_vector
+    ear_position_l = (head_position + ear_direction_l * (head_width / 2)) - np.array([0, 0, pinna_offset_down]) - ear_offset_vector
 
     # Common gpuRIR parameters (applied to both channels)
     room_sz = [4, 4, 2.1]  # Size of the room [m]
@@ -192,22 +197,22 @@ if __name__ == "__main__":
                   arrow_length_ratio=0, color='gray', label="Head position")
 
         # Plot ear directions
-        ax.quiver(head_position[0], head_position[1], head_position[2], ear_direction_l[0],
+        ax.quiver(ear_position_l[0], ear_position_l[1], ear_position_l[2], ear_direction_l[0],
                   ear_direction_l[1], ear_direction_l[2], length=head_width/2, color='b', label="Left ear direction")
-        ax.quiver(head_position[0], head_position[1], head_position[2], ear_direction_r[0], ear_direction_r[1],
+        ax.quiver(ear_position_r[0], ear_position_r[1], ear_position_r[2], ear_direction_r[0], ear_direction_r[1],
                   ear_direction_r[2], length=head_width/2, color='r', label="Right ear direction")
 
         # Plot head direction
         ax.quiver(head_position[0], head_position[1], head_position[2], head_direction[0],
                   head_direction[1], head_direction[2], length=0.2, color='orange', label="Head direction")
-
+        
         # Plot head -> signal source
         ax.quiver(head_position[0], head_position[1], head_position[2], pos_src[0][0] - head_position[0], pos_src[0][1] -
                   head_position[1], pos_src[0][2] - head_position[2], arrow_length_ratio=0.1, color='g', label="Signal source")
         # Plot head -> signal source
         ax.quiver(pos_src[0][0], pos_src[0][1], pos_src[0][2], orV_src[0], orV_src[1],
                   orV_src[2], arrow_length_ratio=0.1, color='black', label="Source steering")
-
+        
         plt.legend()
         plt.show()
 
