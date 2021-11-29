@@ -1,6 +1,6 @@
 # Generate IR with filters
 
-`generate_IR_with_filters` is a script to generate room impulse response (RIRs) files, ready to be used to convolve audio files.
+`generate_IR_with_filters.py` is a script to generate room impulse response (RIRs) files. IR files are saved as a .wav file, ready to be used to convolve audio files.
 Also provided are filters and features which add further functionalities to RIR generation. Goal of those features are achieving the most realistic reverb quality possible, add sonic flexibility, yet striking a balance with performance to increase gpuRIR's attractiveness to machine learning applications such as de-reverberation.
 
 # Features
@@ -26,10 +26,22 @@ Instantiate new filters inside the `filters` array on the `generate_IR_with_filt
 
 The filters are applied in the order the user provided, topmost filters are applied first.
 
+The array can be left empty if no filters are to be applied.
+
+**Example**
+Following is a simple example with a tiny simulated speaker as source, air absorption and a simulated microphone as receiver.
+```
+filters = [
+            CharacteristicFilter(cm.tiny_speaker)
+            AirAbsBandpass(),
+            CharacteristicFilter(cm.sm57_freq_response, params.fs)
+        ]
+```
+
 ## Air absorption
 Applying air absorption using bandpass or STFT (Short Time Fourier Transformation) methods.
 
-### Parameters
+### Parameters
 * **f** Frequency of pure tone.
 * **T** Temperature(degrees Celsius)
 * **hr** Relative humidity
