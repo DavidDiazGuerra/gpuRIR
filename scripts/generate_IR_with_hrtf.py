@@ -169,10 +169,9 @@ if __name__ == "__main__":
 
     ear_position_r = (head_position + ear_direction_r * (head_width / 2)) - np.array([0, 0, pinna_offset_down]) - ear_offset_vector
     ear_position_l = (head_position + ear_direction_l * (head_width / 2)) - np.array([0, 0, pinna_offset_down]) - ear_offset_vector
-
     # Common gpuRIR parameters (applied to both channels)
-    room_sz = [4, 4, 2.1]  # Size of the room [m]
-    pos_src = [[2, 3.5,  1.6]]  # Positions of the sources [m]
+    room_sz = [5, 4, 3]  # Size of the room [m]
+    pos_src = [[3, 3,  1.8]]  # Positions of the sources [m]
     orV_src = [0, -1, 0]  # Steering vector of source(s)
     spkr_pattern = "omni"  # Source polar pattern
     mic_pattern = "homni"  # Receiver polar patterny
