@@ -49,7 +49,7 @@ def automatic_gain_increase(source, bit_depth, ceiling):
     return source * factor
 
 
-def generate_IR(source, filters, bit_depth, fs, visualize=True):
+def generate_IR(source, filters, bit_depth, fs, visualize=False):
     '''
     Generates an IR file out of given source sound data and an optional array of filters to be applied.
 
@@ -106,10 +106,10 @@ if __name__ == "__main__":
     # Define room parameters
     params = rp.RoomParameters(
         room_sz=[5, 4, 3],  # Size of the room [m]
-        pos_src=[[1, 1, 1.6]],  # Positions of the sources [m]
-        pos_rcv=[[4, 3, 1.6]],  # Positions of the receivers [m]
+        pos_src=[[3, 3,  1.8]],  # Positions of the sources [m]
+        pos_rcv=[[1.5, 1.5, 1.6]],  # Positions of the receivers [m]
         orV_src=[0, -1, 0],  # Steering vector of source(s)
-        orV_rcv=[0, 1, 0],  # Steering vector of receiver(s)
+        orV_rcv=[0.1, 1, 0],  # Steering vector of receiver(s)
         spkr_pattern="omni",  # Source polar pattern
         mic_pattern="card",  # Receiver polar pattern
         T60=1.0,  # Time for the RIR to reach 60dB of attenuation [s]
@@ -136,13 +136,13 @@ if __name__ == "__main__":
         filters = [
             # Speaker simulation. 
             # Comment either one out
-            # CharacteristicFilter(cm.tiny_speaker)
+            # CharacteristicFilter(cm.tiny_speaker)
             # LinearFilter(101, (0, 100, 150, 7000, 7001, params.fs/2), (0, 0, 1, 1, 0, 0), params.fs)
 
             # Air absorption simulation. 
             # Comment either one out
-            AirAbsBandpass(),
-            # AirAbsSTFT()
+            # AirAbsBandpass(),
+            # AirAbsSTFT()
 
             # Mic simulation. 
             # Comment either one out

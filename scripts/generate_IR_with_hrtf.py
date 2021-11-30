@@ -88,7 +88,8 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
 
     # Increase Amplitude to usable levels
     if enable_adaptive_gain:
-        ir_array_l, ir_array_r = stereo_adaptive_gain(ir_array_l, ir_array_r, bit_depth, 3)
+        ir_array_l, ir_array_r = stereo_adaptive_gain(
+            ir_array_l, ir_array_r, bit_depth, 3)
 
     # Create stereo file (dual mono)
     ir_array = np.concatenate(
@@ -156,22 +157,25 @@ if __name__ == "__main__":
 
     # Parameters referring to head related transfer functions (HRTF).
     head_width = 0.1449  # [m]
-    head_position = [1.5, 1.5, 1.6] # [m]
-    head_direction = [0.1, 1, 0] # [m]
+    head_position = [1.5, 1.5, 1.6]  # [m]
+    head_direction = [0, -1, 0]  # [m]
 
-    pinna_offset_down = 0.0303 # [m]
-    pinna_offset_back = 0.0046 # [m]
+    pinna_offset_down = 0.0303  # [m]
+    pinna_offset_back = 0.0046  # [m]
 
     ear_direction_r = np.round(rotate_z_plane(head_direction, np.pi/2))
     ear_direction_l = -ear_direction_r
 
-    ear_offset_vector = pinna_offset_back * (head_direction / np.linalg.norm(head_direction, 2))
+    ear_offset_vector = pinna_offset_back * \
+        (head_direction / np.linalg.norm(head_direction, 2))
 
-    ear_position_r = (head_position + ear_direction_r * (head_width / 2)) - np.array([0, 0, pinna_offset_down]) - ear_offset_vector
-    ear_position_l = (head_position + ear_direction_l * (head_width / 2)) - np.array([0, 0, pinna_offset_down]) - ear_offset_vector
+    ear_position_r = (head_position + ear_direction_r * (head_width / 2)) - \
+        np.array([0, 0, pinna_offset_down]) - ear_offset_vector
+    ear_position_l = (head_position + ear_direction_l * (head_width / 2)) - \
+        np.array([0, 0, pinna_offset_down]) - ear_offset_vector
     # Common gpuRIR parameters (applied to both channels)
     room_sz = [5, 4, 3]  # Size of the room [m]
-    pos_src = [[3, 3,  1.8]]  # Positions of the sources [m]
+    pos_src = [[1.5, 1.8, 1.8]]  # Positions of the sources [m]
     orV_src = [0, -1, 0]  # Steering vector of source(s)
     spkr_pattern = "omni"  # Source polar pattern
     mic_pattern = "homni"  # Receiver polar patterny
@@ -204,14 +208,14 @@ if __name__ == "__main__":
         # Plot head direction
         ax.quiver(head_position[0], head_position[1], head_position[2], head_direction[0],
                   head_direction[1], head_direction[2], length=0.2, color='orange', label="Head direction")
-        
+
         # Plot head -> signal source
         ax.quiver(head_position[0], head_position[1], head_position[2], pos_src[0][0] - head_position[0], pos_src[0][1] -
                   head_position[1], pos_src[0][2] - head_position[2], arrow_length_ratio=0.1, color='g', label="Signal source")
         # Plot head -> signal source
         ax.quiver(pos_src[0][0], pos_src[0][1], pos_src[0][2], orV_src[0], orV_src[1],
                   orV_src[2], arrow_length_ratio=0.1, color='black', label="Source steering")
-        
+
         plt.legend()
         plt.show()
 
@@ -231,7 +235,9 @@ if __name__ == "__main__":
 
         # Positions of the receivers [m]
         pos_rcv=[ear_position_l],  # Position of left ear
-        orV_rcv=ear_direction_l  # Steering vector of left ear
+        orV_rcv=ear_direction_l,  # Steering vector of left ear
+        head_direction=head_direction,
+        head_position=head_position
     )
 
     params_right = rp.RoomParameters(
@@ -249,7 +255,9 @@ if __name__ == "__main__":
 
         # Positions of the receivers [m]
         pos_rcv=[ear_position_r],  # Position of right ear
-        orV_rcv=ear_direction_r  # Steering vector of right ear
+        orV_rcv=ear_direction_r,  # Steering vector of right ear
+        head_direction=head_direction,
+        head_position=head_position
     )
 
     # Generate two room impulse responses (RIR) with given parameters for each ear

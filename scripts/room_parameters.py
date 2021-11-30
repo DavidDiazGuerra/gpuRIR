@@ -19,7 +19,9 @@ class RoomParameters:
         fs,
         bit_depth,
         abs_weights = 5 * [0.9] + [0.5],
-        wall_materials = None):
+        wall_materials = None,
+        head_position = None, # Only for HRTF
+        head_direction = None): # Only for HRTF
 
         self.room_sz = room_sz
         self.pos_src = np.array(pos_src)
@@ -33,6 +35,18 @@ class RoomParameters:
         self.bit_depth = bit_depth
         self.abs_weights = abs_weights
         self.wall_materials = wall_materials
+
+
+        if head_position is None:
+            self.head_position = pos_rcv
+        else:  # Only for HRTF
+            self.head_position = head_position
+
+        if head_direction is None:
+            self.head_direction = orV_rcv
+        else:  # Only for HRTF
+            self.head_direction = head_direction
+
 
         # Switch between self-determined wall coefficients used for frequency dependent wall absorption coefficients
         self.beta = gpuRIR.beta_SabineEstimation(room_sz, T60, abs_weights=abs_weights)  # Reflection coefficients

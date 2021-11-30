@@ -12,12 +12,15 @@ class HRTF_Filter(FilterStrategy):
 
     @staticmethod
     def find_angle(u, v):
+        '''
+        Find angle via trigonometry
+        '''
         return np.arccos((u @ v) / (np.linalg.norm(u) * np.linalg.norm(v)))
 
 
     # Find elevation between head and source
     @staticmethod
-    def calculate_elevation(pos_src, pos_rcv, rcv_orV):
+    def calculate_elevation(pos_src, pos_rcv, head_direction):
         # Height of source
         opposite = np.abs(pos_src[2]-pos_rcv[2]) 
 
@@ -33,10 +36,10 @@ class HRTF_Filter(FilterStrategy):
             el_rcv_src = -el_rcv_src
 
         # Height of receiver
-        opposite = np.abs(rcv_orV[2])
+        opposite = np.abs(head_direction[2])
 
         # Length of floor distance between head and head direction vector
-        adjacent = np.linalg.norm(rcv_orV)
+        adjacent = np.linalg.norm(head_direction)
 
         # Calculate elevation between head and head direction
         el_rcv_dir = np.arctan(opposite / adjacent)
@@ -46,25 +49,38 @@ class HRTF_Filter(FilterStrategy):
 
 
     @staticmethod
-    def calculate_azimuth(pos_src, pos_rcv, rcv_orV):
+    def calculate_azimuth(pos_src, pos_rcv, head_direction):
         # 3D vector from head position (origin) to source
         head_to_src = pos_src - pos_rcv
+
         # Extract 2D array from 3D
         head_to_src = np.array([head_to_src[0], head_to_src[1]])
-        headdir_xy = [rcv_orV[0], rcv_orV[1]]  # Extract 2D array from 3D
-        return HRTF_Filter.find_angle(headdir_xy, head_to_src)
+        headdir_xy = [head_direction[0], head_direction[1]]  # Extract 2D array from 3D
+        
+        # Find angle using trigonometry
+        angle = HRTF_Filter.find_angle(headdir_xy, head_to_src)
+
+        # Check if azimuth goes above 90°
+        if angle>np.pi/2:
+            difference = (np.pi / 2) - angle
+            return (np.pi / 2) + difference
+
+        # Check left/right. If positive direction is left, if negative direction is right.
+        side = np.sign(np.linalg.det([headdir_xy, head_to_src]))
+
+        return angle * (-side)
 
 
     def hrtf_convolve(self, IR):
         elevation = self.calculate_elevation(
-            self.params.pos_src[0], self.params.pos_rcv[0], self.params.orV_rcv[0])
+            self.params.pos_src[0], self.params.head_position, self.params.head_direction)
 
-        # print(f"Elevation = {elevation * (180 / np.pi)}")
+        print(f"Elevation = {elevation * (180 / np.pi)}")
 
         azimuth = self.calculate_azimuth(
-            self.params.pos_src[0], self.params.pos_rcv[0], self.params.orV_rcv[0])
+            self.params.pos_src[0], self.params.head_position, self.params.head_direction)
 
-        # print(f"Azimuth = {azimuth * (180 / np.pi)}")
+        print(f"Azimuth = {azimuth * (180 / np.pi)}")
 
         hrir_channel = self.hrtf_rir.get_hrtf_rir(
             elevation, azimuth, self.channel)
