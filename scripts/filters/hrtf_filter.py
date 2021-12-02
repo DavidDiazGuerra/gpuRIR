@@ -21,8 +21,9 @@ class HRTF_Filter(FilterStrategy):
     # Find elevation between head and source
     @staticmethod
     def calculate_elevation(pos_src, pos_rcv, head_direction):
+        '''
         # Height of source
-        opposite = np.abs(pos_src[2]-pos_rcv[2]) 
+        opposite = np.abs(pos_src[2] - pos_rcv[2]) 
 
         # Length of floor distance between head and source
         adjacent = np.linalg.norm(
@@ -46,7 +47,19 @@ class HRTF_Filter(FilterStrategy):
 
         # Subtract elevation between head and source and between head and head direction
         return el_rcv_src - el_rcv_dir
+        '''
+        # Move source to origin
+        local_pos_src = np.copy(pos_src)
+        local_pos_src[0] -= pos_rcv[0]
+        local_pos_src[1] -= pos_rcv[1]
+        local_pos_src[2] -= pos_rcv[2]
+        
+        elev = np.arctan2(local_pos_src[2], local_pos_src[1])
 
+        if local_pos_src[1] < 0 and local_pos_src[2] < 0:
+            elev += np.pi * 2
+        
+        return elev
 
     @staticmethod
     def calculate_azimuth(pos_src, pos_rcv, head_direction):
@@ -59,11 +72,12 @@ class HRTF_Filter(FilterStrategy):
         
         # Find angle using trigonometry
         angle = HRTF_Filter.find_angle(headdir_xy, head_to_src)
+        print(f"i can be yuor devil and u can be my angle: {angle}")
 
         # Check if azimuth goes above 90°
-        if angle>np.pi/2:
+        if angle > np.pi/2:
             difference = (np.pi / 2) - angle
-            return (np.pi / 2) + difference
+            angle = (np.pi / 2) + difference
 
         # Check left/right. If positive direction is left, if negative direction is right.
         side = np.sign(np.linalg.det([headdir_xy, head_to_src]))
