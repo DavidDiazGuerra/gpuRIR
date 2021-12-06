@@ -1,9 +1,9 @@
 import numpy as np
+import numpy.matlib as ml
 import gpuRIR
 
 
 class RoomParameters:
-
     def __init__(
         self,
         room_sz,
@@ -26,8 +26,8 @@ class RoomParameters:
         self.room_sz = room_sz
         self.pos_src = np.array(pos_src)
         self.pos_rcv = np.array(pos_rcv)
-        self.orV_src = np.matlib.repmat(np.array(orV_src), len(pos_src), 1)
-        self.orV_rcv = np.matlib.repmat(np.array(orV_rcv), len(pos_rcv), 1)
+        self.orV_src = ml.repmat(np.array(orV_src), len(pos_src), 1)
+        self.orV_rcv = ml.repmat(np.array(orV_rcv), len(pos_rcv), 1)
         self.spkr_pattern = spkr_pattern
         self.mic_pattern = mic_pattern
         self.T60 = T60

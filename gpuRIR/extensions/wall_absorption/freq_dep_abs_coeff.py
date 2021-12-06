@@ -11,8 +11,7 @@ from scipy.signal import butter, lfilter, filtfilt
 import multiprocessing
 from multiprocessing import Pool
 
-from generate_RIR import generate_RIR
-
+import generate_RIR
 '''
 Interpolates frequency response array. Returns a function.
 '''
