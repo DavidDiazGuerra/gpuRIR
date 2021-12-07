@@ -1,30 +1,30 @@
-"""
-Generates an impulse response WAV file (IR) with optional filters.
-Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
-"""
-from filters.filter import Filter
-import librosa
-from filters.characteristic_filter import CharacteristicFilter
-from filters.air_absorption_bandpass import AirAbsBandpass
-from filters.air_absorption_stft import AirAbsSTFT
-from filters.linear_filter import LinearFilter
-
-import filters.characteristic_models as cm
-import filters.air_absorption_calculation as aa
-
-from wall_absorption.materials import Materials as mat
-import wall_absorption.freq_dep_abs_coeff as fdac
-
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
 from math import ceil
 from scipy.io import wavfile
 import time
-from create_spectrogram import create_spectrogram_from_file
 
-import room_parameters as rp
-from generate_RIR import generate_RIR
+from gpuRIR.extensions.filters.filter import Filter
+from gpuRIR.extensions.filters.characteristic_filter import CharacteristicFilter
+from gpuRIR.extensions.filters.air_absorption_bandpass import AirAbsBandpass
+from gpuRIR.extensions.filters.air_absorption_stft import AirAbsSTFT
+from gpuRIR.extensions.filters.linear_filter import LinearFilter
+import gpuRIR.extensions.filters.characteristic_models as cm
+import gpuRIR.extensions.filters.air_absorption_calculation as aa
+from gpuRIR.extensions.wall_absorption.materials import Materials as mat
+import gpuRIR.extensions.wall_absorption.freq_dep_abs_coeff as fdac
+from gpuRIR.extensions.create_spectrogram import create_spectrogram_from_file
+import gpuRIR.extensions.room_parameters as rp
+from gpuRIR.extensions.generate_RIR import generate_RIR
+from gpuRIR.extensions.create_spectrogram import *
+
+
+"""
+Generates an impulse response WAV file (IR) with optional filters.
+Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
+TODO: Update doc
+"""
 
 
 def mono_adaptive_gain(source, bit_depth, ceiling):
@@ -47,6 +47,7 @@ def mono_adaptive_gain(source, bit_depth, ceiling):
     factor = max_gain/peak
 
     return source * factor
+
 
 def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
     '''
@@ -79,12 +80,14 @@ def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
     return (source_l * factor, source_r * factor)
 
 
-def generate_mono_IR(source, filters, bit_depth, fs, visualize=False):
+def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True,  visualize=False, verbose=False):
     '''
     Generates an IR file out of given source sound data and an optional array of filters to be applied.
 
     :param list source: Sound data to be converted into an impulse response file.
     :param list filters: List of filters to be applied (in that order)
+
+    TODO: Update doc
     '''
     # Prepare sound data arrays.
     source_signal = np.copy(source)
@@ -95,15 +98,19 @@ def generate_mono_IR(source, filters, bit_depth, fs, visualize=False):
         start_time = time.time()
         source_signal = Filter(filters[i]).apply(source_signal)
         end_time = time.time()
-        print(f"{filters[i].NAME} time = {end_time-start_time} seconds")
+
+        # Print processing time per filter (relevant for benchmarking)
+        if verbose:
+            print(f"{filters[i].NAME} time = {end_time-start_time} seconds")
         filename_appendix = f"{filename_appendix}_{filters[i].NAME}"
 
     # Stack array vertically
     impulseResponseArray = np.vstack(source_signal)
 
     # Increase Amplitude to usable levels
-    impulseResponseArray = mono_adaptive_gain(
-        impulseResponseArray, bit_depth, 3)
+    if enable_adaptive_gain:
+        impulseResponseArray = mono_adaptive_gain(
+            impulseResponseArray, bit_depth, 3)
 
     # Create stereo file (dual mono)
     impulseResponseArray = np.concatenate(
@@ -123,12 +130,14 @@ def generate_mono_IR(source, filters, bit_depth, fs, visualize=False):
         plt.show()
 
 
-def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, visualize=True, enable_adaptive_gain=True):
+def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, enable_adaptive_gain=True, verbose=False, visualize=False):
     '''
     Generates an IR file out of given source sound data and an optional array of filters to be applied.
 
     :param list source: Sound data to be converted into an impulse response file.
     :param list filters: List of filters to be applied (in that order)
+
+    TODO: Update doc
     '''
     # Prepare stereo sound data arrays.
     source_signal_r = np.copy(source_r)
@@ -140,14 +149,20 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
         start_time = time.time()
         source_signal_r = Filter(filters_r[i]).apply(source_signal_r)
         end_time = time.time()
-        print(f"{filters_r[i].NAME} time = {end_time-start_time} seconds")
+        # Print processing time per filter (relevant for benchmarking)
+        if verbose:
+            print(
+                f"Right Channel {filters_r[i].NAME} time = {end_time-start_time} seconds")
         filename_appendix = f"{filename_appendix}_{filters_r[i].NAME}"
 
     for i in range(len(filters_l)):
         start_time = time.time()
         source_signal_l = Filter(filters_l[i]).apply(source_signal_l)
         end_time = time.time()
-        print(f"{filters_l[i].NAME} time = {end_time-start_time} seconds")
+        # Print processing time per filter (relevant for benchmarking)
+        if verbose:
+            print(
+                f"Left Channel {filters_l[i].NAME} time = {end_time-start_time} seconds")
         filename_appendix = f"{filename_appendix}_{filters_l[i].NAME}"
 
     # Stack array vertically
@@ -178,4 +193,3 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
         plt.plot(ir_array_r, label="Right channel")
         plt.title("Right channel")
         plt.show()
-

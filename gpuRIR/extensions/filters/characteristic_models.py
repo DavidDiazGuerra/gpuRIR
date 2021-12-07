@@ -4,7 +4,7 @@ import numpy as np
 Microphone models
 '''
 # Shure SM57 dynamic microphone. Standard mic for US presidential speeches
-sm57_freq_response = np.array([
+sm57 = np.array([
     # Frequency in Hz | Relative response in dB
     [50, -10],
     [100, -4],
@@ -28,7 +28,7 @@ sm57_freq_response = np.array([
 ])
 
 # iPhone X.
-iphone_x_freq_response = np.array([
+iphone_x_speaker = np.array([
     [30, -12],
     [40, -3],
     [50, 0],

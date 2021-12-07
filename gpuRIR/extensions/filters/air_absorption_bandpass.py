@@ -1,10 +1,10 @@
-from filters.filter import FilterStrategy
-from filters.air_absorption_calculation import air_absorption
-
 import numpy as np
 from scipy.signal import butter, lfilter, filtfilt
 import multiprocessing
 from multiprocessing import Pool
+
+from gpuRIR.extensions.filters.filter import FilterStrategy
+from gpuRIR.extensions.filters.air_absorption_calculation import air_absorption
 
 
 class AirAbsBandpass(FilterStrategy):
