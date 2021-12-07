@@ -1,14 +1,16 @@
 import numpy as np
-from filters.filter import FilterStrategy
-from hrtf.hrtf_rir import HRTF_RIR
+
+from gpuRIR.extensions.filters.filter import FilterStrategy
+from gpuRIR.extensions.hrtf.hrtf_rir import HRTF_RIR
 
 
 class HRTF_Filter(FilterStrategy):
-    def __init__(self, channel, params):
+    def __init__(self, channel, params, verbose=False):
         self.channel = channel
         self.NAME = "HRTF"
         self.params = params
         self.hrtf_rir = HRTF_RIR()
+        self.verbose = verbose
 
     @staticmethod
     def find_angle(u, v):
@@ -72,7 +74,6 @@ class HRTF_Filter(FilterStrategy):
         
         # Find angle using trigonometry
         angle = HRTF_Filter.find_angle(headdir_xy, head_to_src)
-        print(f"i can be yuor devil and u can be my angle: {angle}")
 
         # Check if azimuth goes above 90°
         if angle > np.pi/2:
@@ -88,12 +89,14 @@ class HRTF_Filter(FilterStrategy):
         elevation = self.calculate_elevation(
             self.params.pos_src[0], self.params.head_position, self.params.head_direction)
 
-        print(f"Elevation = {elevation * (180 / np.pi)}")
+        if self.verbose:
+            print(f"Elevation = {elevation * (180 / np.pi)}")
 
         azimuth = self.calculate_azimuth(
             self.params.pos_src[0], self.params.head_position, self.params.head_direction)
 
-        print(f"Azimuth = {azimuth * (180 / np.pi)}")
+        if self.verbose:
+            print(f"Azimuth = {azimuth * (180 / np.pi)}")
 
         hrir_channel = self.hrtf_rir.get_hrtf_rir(
             elevation, azimuth, self.channel)

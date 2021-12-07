@@ -1,9 +1,6 @@
-""" 
-Generates an impulse response WAV file (IR) with optional filters.
-Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
-"""
+import gpuRIR.extensions.filters.air_absorption_calculation as aa
+
 import librosa
-import filters.air_absorption_calculation as aa
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -15,6 +12,10 @@ from scipy import signal
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+""" 
+Generates an impulse response WAV file (IR) with optional filters.
+Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
+"""
 
 # Feel free to change these parameters
 PARTITIONS = 81

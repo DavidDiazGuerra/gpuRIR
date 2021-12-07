@@ -14,7 +14,7 @@ class HRTF_RIR:
 
         self.elev_step = (360/64)
         self.elevations = np.arange(-45, 230.625 + self.elev_step, self.elev_step, dtype=np.float32)
-        self.hrir = loadmat('scripts/hrtf/cipic_hrir/hrir_final.mat')
+        self.hrir = loadmat('gpuRIR/extensions/hrtf/cipic_hrir/hrir_final.mat')
 
     def azimuth_to_idx(self, azimuth):
         return int(np.argmin(np.abs(self.azimuths - azimuth)))
@@ -23,10 +23,10 @@ class HRTF_RIR:
         return int(np.argmin(np.abs(self.elevations - elevation)))
 
 
-    def get_hrtf_rir(self, elevation, azimuth, channel, plot=False):
+    def get_hrtf_rir(self, elevation, azimuth, channel, visualize=False):
         hrir_channel = self.hrir['hrir_'+channel][:, self.elevation_to_idx(elevation), :]
 
-        if plot:
+        if visualize:
             plt.plot(hrir_channel[self.azimuth_to_idx(azimuth)])
         plt.show()
 

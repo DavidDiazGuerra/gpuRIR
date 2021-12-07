@@ -1,8 +1,8 @@
-from scipy.signal import istft, stft
-from filters.filter import FilterStrategy
-import filters.air_absorption_calculation as aa
+from gpuRIR.extensions.filters.filter import FilterStrategy
+import gpuRIR.extensions.filters.air_absorption_calculation as aa
 
 import numpy as np
+from scipy.signal import istft, stft
 
 
 class AirAbsSTFT(FilterStrategy):

@@ -1,22 +1,21 @@
+import gpuRIR
+from .materials import Materials as mat
+import gpuRIR.extensions.generate_RIR as gRIR
+
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
 from math import ceil
 from scipy.interpolate import interp1d
 import time
-import gpuRIR
-from .materials import Materials as mat
-
 from scipy.signal import butter, lfilter, filtfilt
 import multiprocessing
 from multiprocessing import Pool
 
-from generate_RIR import generate_RIR
-
 '''
 Interpolates frequency response array. Returns a function.
 '''
-def interpolate_pair(abs_coeff, plot):
+def interpolate_pair(abs_coeff, visualize):
     # y: absorption coefficient
     # x: frequency [Hz]
     y = abs_coeff[:, 1]
@@ -24,7 +23,8 @@ def interpolate_pair(abs_coeff, plot):
     f = interp1d(x, y, bounds_error=False, fill_value=(y[0], y[-1]))
     x_interpolated = np.arange(1, 20000)
     y_interpolated = f(x_interpolated)
-    if plot:
+    if visualize:
+        plt.title('Virtual Room Materials: Interpolated Frequency Responses')
         plt.plot(x, y, 'o')
         plt.plot(x_interpolated, y_interpolated, "-")
     return f
@@ -90,7 +90,7 @@ LR:                 Uses Linkwitz-Riley filtering. LR filter order is a double o
 plot:               Plots the interpolated material frequency response curve.
 verbose:            Prints current band parameters.
 '''
-def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=True, plot=False, verbose=False):
+def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=True, visualize=False, verbose=False):
     assert(band_width > 1), "Band width must be greater than 1!"
     assert(factor > 1), "Factor must be greater than 1!"
 
@@ -138,22 +138,23 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=2, LR=
     if verbose: print(f"Min:{current_min}\tMean:{(current_min + max_frequency) / 2}\tMax:{max_frequency}")
 
     # We create 6 interpolating functions for each material:
-    wall_mat_interp = [interpolate_pair(mat, plot)
+    wall_mat_interp = [interpolate_pair(mat, visualize)
                        for mat in params.wall_materials]
-    if plot:
+    if visualize:
         show_plot()
 
     receiver_channels = np.zeros((len(params.pos_rcv), 1))
 
     for i in range(len(bands)):
         band = bands[i]
-        print(band[0])
+        if verbose:
+            print(f"Band {i}: {band[0]}")
         abs_coeffs = np.zeros(len(wall_mat_interp))
         for j in range(len(wall_mat_interp)):
             abs_coeffs[j] = wall_mat_interp[j](band[1])
         # Generate RIR
         params.beta = 6 * [1.] - abs_coeffs
-        RIR = generate_RIR(params)
+        RIR = gRIR.generate_RIR(params)
 
         # Apply band/lowpassing and re-compiling sound data
         for rcv in range(len(params.pos_rcv)):          
