@@ -5,6 +5,11 @@ from gpuRIR.extensions.hrtf.hrtf_rir import HRTF_RIR
 
 
 class HRTF_Filter(FilterStrategy):
+    ANGLE_90 = np.pi/2
+    ANGLE_180 = np.pi
+
+
+
     def __init__(self, channel, params, verbose=False):
         self.channel = channel
         self.NAME = "HRTF"
@@ -45,9 +50,16 @@ class HRTF_Filter(FilterStrategy):
 
         # Calculate elevation between head and head direction
         el_rcv_dir = np.arctan(opposite / adjacent)
+        elevation_angle = el_rcv_src - el_rcv_dir
+
+        # Edge case if source is behind head
+        angle, _, _ = HRTF_Filter.vector_between_points(pos_src, pos_rcv, head_direction)
+        if angle > HRTF_Filter.ANGLE_90:
+            # Source is behind head
+            elevation_angle = HRTF_Filter.ANGLE_180 - elevation_angle
 
         # Subtract elevation between head and source and between head and head direction
-        return el_rcv_src - el_rcv_dir
+        return elevation_angle
         '''
         # Move source to origin
         local_pos_src = np.copy(pos_src)
@@ -64,7 +76,7 @@ class HRTF_Filter(FilterStrategy):
         '''
 
     @staticmethod
-    def calculate_azimuth(pos_src, pos_rcv, head_direction):
+    def vector_between_points(pos_src, pos_rcv, head_direction):
         # 3D vector from head position (origin) to source
         head_to_src = pos_src - pos_rcv
 
@@ -72,11 +84,16 @@ class HRTF_Filter(FilterStrategy):
         head_to_src = np.array([head_to_src[0], head_to_src[1]])
         headdir_xy = [head_direction[0], head_direction[1]]  # Extract 2D array from 3D
         
+        # Return angle using trigonometry
+        return HRTF_Filter.find_angle(headdir_xy, head_to_src), head_to_src, headdir_xy
+
+    @staticmethod
+    def calculate_azimuth(pos_src, pos_rcv, head_direction):
         # Find angle using trigonometry
-        angle = HRTF_Filter.find_angle(headdir_xy, head_to_src)
+        angle, head_to_src, headdir_xy = HRTF_Filter.vector_between_points(pos_src, pos_rcv, head_direction)
 
         # Check if azimuth goes above 90°
-        if angle > np.pi/2:
+        if angle > HRTF_Filter.ANGLE_90:
             angle = np.pi - angle
 
         # Check left/right. If positive direction is left, if negative direction is right.
