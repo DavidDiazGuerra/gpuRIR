@@ -18,6 +18,7 @@ from gpuRIR.extensions.create_spectrogram import create_spectrogram_from_file
 import gpuRIR.extensions.room_parameters as rp
 from gpuRIR.extensions.generate_RIR import generate_RIR
 from gpuRIR.extensions.create_spectrogram import *
+# TODO: optimize imports
 
 
 """

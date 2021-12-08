@@ -15,7 +15,7 @@ from gpuRIR.extensions.filters.linear_filter import LinearFilter
 
 
 # Visualizes waveform and spectrogram of each generated IR file. Depending on filter, additional graphs are drawn.
-visualize = False
+visualize = True
 
 # Prints calculation times and parameter/processing info onto the terminal if True. Needed for benchmarking, debugging and further info.
 verbose = False
@@ -69,7 +69,7 @@ for i in range(len(params.pos_rcv)):
 
         # Air absorption simulation.
         # Comment either one out
-        # AirAbsBandpass(),
+        AirAbsBandpass(divisions=10, max_frequency=params.fs/2, order=12, verbose=verbose, visualize=visualize),
         # AirAbsSTFT(),
 
         # Mic simulation.

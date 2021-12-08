@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.io import loadmat
+from scipy.signal import spectrogram
 from matplotlib import pyplot as plt
 
 class HRTF_RIR:
@@ -27,7 +28,14 @@ class HRTF_RIR:
         hrir_channel = self.hrir['hrir_'+channel][:, self.elevation_to_idx(elevation), :]
 
         if visualize:
-            plt.plot(hrir_channel[self.azimuth_to_idx(azimuth)])
-        plt.show()
-
+            x = hrir_channel[self.azimuth_to_idx(azimuth)]
+            plt.title("HRTF Frequency Response")
+            plt.rcParams.update({'font.size': 18})
+            plt.plot(x)
+            plt.xlabel("Sample [n]")
+            plt.ylabel("Amplitude")
+            plt.show()
         return hrir_channel[self.azimuth_to_idx(azimuth)]
+
+obj = HRTF_RIR()
+obj.get_hrtf_rir(0, 0, 'r', True)
