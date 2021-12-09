@@ -36,6 +36,3 @@ class HRTF_RIR:
             plt.ylabel("Amplitude")
             plt.show()
         return hrir_channel[self.azimuth_to_idx(azimuth)]
-
-obj = HRTF_RIR()
-obj.get_hrtf_rir(0, 0, 'r', True)
