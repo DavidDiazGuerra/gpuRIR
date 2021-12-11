@@ -1,11 +1,15 @@
-# Generate IR with filters
+# gpuRIR extensions
+Expands the functionality of gpuRIR by multiple optional extensions, listed as follows:
+* Frequency dependent absorption coefficients (virtual room materials)
+* Air absorption (via Bandpassing or STFT)
+* Source and receiver characteristics (virtual mic / speaker models
+* Binaural receiver (two receivers in room)
+* Head-related transfer function (simulated human hearing)
+* Room parameter class for gpuRIR (consolidating and automatically calculating parameters)
+* Easy impulse response (IR) file generation with stereo support
 
-`generate_IR_with_filters.py` is a script to generate room impulse response (RIRs) files. IR files are saved as a .wav file, ready to be used to convolve audio files.
-Also provided are filters and features which add further functionalities to RIR generation. Goal of those features are achieving the most realistic reverb quality possible, add sonic flexibility, yet striking a balance with performance to increase gpuRIR's attractiveness to machine learning applications such as de-reverberation.
-
-# Features
 ## Frequency dependent absorption coefficients
-Models the impact different wall materials have on the reflective properties of a room. Depending on the material, different frequency bands are absorbed more or less. More materials can be defined manually in `wall-materials/materials.py`.
+Models the impact different wall materials have on the reflective properties of a room. Depending on the material, different frequency bands are absorbed more or less. More materials can be defined manually in `wall_absorption/materials.py`.
 
 Frequency bands are allocated dynamically in a logarithmic manner, and band distribution is parameterized depending to the user's need for performance or quality.
 
@@ -22,7 +26,7 @@ Add six materials (`mat.name_of_material`) to `wall_materials` array correspondi
 
 # Filters
 ### Usage of filters
-Instantiate new filters inside the `filters` array on the `generate_IR_with_filters.py` script. Some commented-out code are placed there as a guide. All filters have pre-defined parameters as standard values, but can be overridden with user values.
+Instantiate new filters inside the `filters` array on the `mono_filters.py` example script. Some commented-out code are placed there as a guide. All filters have pre-defined parameters as standard values, but can be overridden with user values.
 
 The filters are applied in the order the user provided, topmost filters are applied first.
 
@@ -32,9 +36,9 @@ The array can be left empty if no filters are to be applied.
 Following is a simple example with a tiny simulated speaker as source, air absorption and a simulated microphone as receiver.
 ```
 filters = [
-            CharacteristicFilter(cm.tiny_speaker)
+            CharacteristicFilter(model.tiny_speaker)
             AirAbsBandpass(),
-            CharacteristicFilter(cm.sm57_freq_response, params.fs)
+            CharacteristicFilter(model.sm57_freq_response, params.fs)
         ]
 ```
 
