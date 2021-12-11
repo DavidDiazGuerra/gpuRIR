@@ -68,20 +68,6 @@ class HRTF_Filter(FilterStrategy):
 
         # Subtract elevation between head and source and between head and head direction
         return elevation_angle
-        '''
-        # Move source to origin
-        local_pos_src = np.copy(pos_src)
-        local_pos_src[0] -= pos_rcv[0]
-        local_pos_src[1] -= pos_rcv[1]
-        local_pos_src[2] -= pos_rcv[2]
-        
-        elev = np.arctan2(local_pos_src[1], -local_pos_src[2])
-
-        if local_pos_src[1] < 0 and -local_pos_src[2] < 0:
-            elev += np.pi * 2
-        
-        return elev
-        '''
 
     @staticmethod
     def vector_between_points(pos_src, pos_rcv, head_direction):

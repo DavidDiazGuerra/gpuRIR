@@ -14,10 +14,14 @@ class LinearFilter(FilterStrategy):
         self.visualize=visualize
         self.NAME = "linear"
 
-    '''
-    Applies a linear filter.
-    '''
+    
     def apply_linear_filter(self, data):
+        '''
+        Applies a linear filter.
+
+        :param data Sound data.
+        :returns Filtered sound data.
+        '''
         b_siumulated_mic = scipy.signal.firls(self.numtaps, self.bands, self.desired, fs=self.fs)  # design filter
 
         if self.visualize:
