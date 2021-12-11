@@ -5,33 +5,76 @@ from gpuRIR.extensions.hrtf.hrtf_rir import HRTF_RIR
 
 
 class HRTF_Filter(FilterStrategy):
+    ''' Head related transfer function to simulate psychoacoustic effects of a human head and upper body.
+    '''
+    # 90 degree angle in radiants
     ANGLE_90 = np.pi/2
+
+    # 180 degree angle in radiants
     ANGLE_180 = np.pi
 
-    def __init__(self, channel, params, verbose=False, visualize=False):
+    def __init__(self, channel, params, verbose=False):
+        ''' Initialized HRTF filter.
+
+        Parameters
+        ----------
+        channel : str
+            Determines if left or right channel is being processed. Either 'l' or 'r'.
+        params : RoomParameters
+            Abstracted gpuRIR parameter class object.
+        verbose : bool, optional
+            Terminal output for debugging or further information
+        '''
         self.channel = channel
         self.NAME = "HRTF"
         self.params = params
         self.hrtf_rir = HRTF_RIR()
         self.verbose = verbose
-        self.visualize = visualize
 
     @staticmethod
     def find_angle(u, v):
-        '''
-        Find angle via trigonometry
+        ''' Find angle between two vectors on a 2D plane.
+
+        Parameters
+        ----------
+        u : ndarray
+            Vector with two elements
+        v : ndarray
+            Vector with two elements
+
+        Returns
+        -------
+        float
+            Scalar angle in radiants.
+        
         '''
         norm_product = (np.linalg.norm(u) * np.linalg.norm(v))
-        
+
         if norm_product != 0:
-            return np.arccos((u @ v) / norm_product) 
-        
+            return np.arccos((u @ v) / norm_product)
+
         return 0
 
     # Find elevation between head and source
 
     @staticmethod
     def calculate_elevation(pos_src, pos_rcv, head_direction):
+        ''' Calculates elevation between head position / direction and signal source position.
+
+        Parameters
+        ----------
+        pos_src : 3D ndarray
+            Position of signal source.
+        pos_rcv : 3D ndarray
+            Position of signal receiver (center of head).
+        head_direction : 3D ndarray
+            Direction in which the head is pointing towards.
+
+        Returns
+        -------
+        float
+            Elevation angle between head position / direction and signal source.
+        '''
         # Height of source
         opposite = np.abs(pos_src[2] - pos_rcv[2])
 
@@ -41,9 +84,9 @@ class HRTF_Filter(FilterStrategy):
 
         # Find elevation between head and source positions
         if adjacent != 0:
-            el_rcv_src = np.arctan(opposite / adjacent) 
+            el_rcv_src = np.arctan(opposite / adjacent)
         else:
-            el_rcv_src=np.arctan(np.inf)
+            el_rcv_src = np.arctan(np.inf)
 
         # Edge case if source is below head
         if pos_rcv[2] > pos_src[2]:
@@ -53,11 +96,16 @@ class HRTF_Filter(FilterStrategy):
         opposite = np.abs(head_direction[2])
 
         # Length of floor distance between head and head direction vector
-        adjacent = np.linalg.norm(head_direction)
+        adjacent = np.linalg.norm(np.array([head_direction[0], head_direction[1]]))
 
         # Calculate elevation between head and head direction
         el_rcv_dir = np.arctan(opposite / adjacent)
-        elevation_angle = el_rcv_src - el_rcv_dir
+
+        # Edge case if source is below head
+        if pos_rcv[2] > pos_src[2]:
+            elevation_angle = el_rcv_src + el_rcv_dir
+        else:
+            elevation_angle = el_rcv_src - el_rcv_dir
 
         # Edge case if source is behind head
         angle, _, _ = HRTF_Filter.vector_between_points(
@@ -71,6 +119,27 @@ class HRTF_Filter(FilterStrategy):
 
     @staticmethod
     def vector_between_points(pos_src, pos_rcv, head_direction):
+        ''' Calculates a vector between two points in a 2D plane.
+
+        Parameters
+        ----------
+        pos_src : 3D ndarray
+            Position of signal source.
+        pos_rcv : 3D ndarray
+            Position of signal receiver (center of head).
+        head_direction : 3D ndarray
+            Direction in which the head is pointing towards.
+
+        Returns
+        -------
+        float
+            Scalar angle in radiants.
+        2D ndarray
+            2D Vector between head and signal source.
+        2D ndarray
+            2D vector of head direction.
+
+        '''
         # 3D vector from head position (origin) to source
         head_to_src = pos_src - pos_rcv
 
@@ -84,6 +153,22 @@ class HRTF_Filter(FilterStrategy):
 
     @staticmethod
     def calculate_azimuth(pos_src, pos_rcv, head_direction):
+        ''' Calculates azimuth between head position / direction and signal source position.
+
+        Parameters
+        ----------
+        pos_src : 3D ndarray
+            Position of signal source.
+        pos_rcv : 3D ndarray
+            Position of signal receiver (center of head).
+        head_direction : 3D ndarray
+            Direction in which the head is pointing towards.
+
+        Returns
+        -------
+        float
+            Azimuth angle between head position / direction and signal source.
+        '''
         # Find angle using trigonometry
         angle, head_to_src, headdir_xy = HRTF_Filter.vector_between_points(
             pos_src, pos_rcv, head_direction)
@@ -98,6 +183,19 @@ class HRTF_Filter(FilterStrategy):
         return angle * (-side)
 
     def hrtf_convolve(self, IR):
+        '''
+        Convolves an impulse response (IR) array with a HRTF room impulse response (RIR) retrieved from the CIPIC database.
+
+        Parameters
+        ----------
+        IR : 2D ndarray
+            Room impulse response array.
+
+        Returns
+	    -------
+        2D ndarray
+            Processed Room impulse response array.
+        '''
         elevation = self.calculate_elevation(
             self.params.pos_src[0], self.params.head_position, self.params.head_direction)
 
@@ -116,4 +214,17 @@ class HRTF_Filter(FilterStrategy):
         return np.convolve(IR[0], hrir_channel, mode='same')
 
     def apply(self, IR):
+        ''' Calls method to apply HRTF filtering on the source data.
+
+        Parameters
+	    ----------
+        IR : 2D ndarray
+            Room impulse response array.
+
+        Returns
+	    -------
+        2D ndarray
+            Processed Room impulse response array.
+
+        '''
         return self.hrtf_convolve(IR)

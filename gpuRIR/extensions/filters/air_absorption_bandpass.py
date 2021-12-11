@@ -10,7 +10,32 @@ from gpuRIR.extensions.filters.butterworth import Butterworth
 
 
 class AirAbsBandpass(FilterStrategy):
-    def __init__(self, max_frequency = 22050, min_frequency = 1, divisions = 50, fs = 44100, order = 4, LR = False, verbose = False, visualize = False):
+    ''' Applies air absorption attenuation using bandpassing. 
+    Splits the frequency bands into defined amount of divisions, applies air absorption and combines the bands back into one RIR.
+    '''
+
+    def __init__(self, max_frequency=22050, min_frequency=1, divisions=50, fs=44100, order=4, LR=False, verbose=False, visualize=False):
+        ''' Instantiates bandpass-driven air absorption.
+
+        Parameters
+	    ----------
+        max_frequency : int
+            Top end of frequency range (High pass cut).
+        min_frequency : int
+            Bottom end of frequency range (Low pass cut).
+        divisions : int
+            Amount of bands the RIR gets divided into. The higher the value the better the quality, but with performance penalties.
+        fs : int
+            Sample rate [Hz]
+        order : int
+            Order of Butterworth or Linkwitz-Riley filter.
+        LR : bool, optional
+            Enables Linkwitz-Riley filter.
+        verbose : bool, optional
+            Terminal output for debugging or further information.
+        visualize : bool, optional
+            Plots band divisions in a graph
+        '''
         assert(order >= 4), "Order must be greater than 4!"
 
         self.min_frequency = min_frequency
@@ -25,17 +50,40 @@ class AirAbsBandpass(FilterStrategy):
         self.visualize = visualize
         self.verbose = verbose
 
-    '''
-    Calculates how much distance the sound has travelled. [m]
-    '''
     @staticmethod
     def distance_travelled(sample_number, sampling_frequency, c):
+        ''' Calculates how much distance the sound has travelled in meters.
+
+        Parameters
+	    ----------
+        sample_number : int
+            How many samples have passed.
+        sampling_frequency : int
+            Sample rate [Hz]
+        c : float
+            Speed of sound. 
+
+        Returns
+	    -------
+            Time passed since first sample [s]
+        '''
         seconds_passed = sample_number * (sampling_frequency ** (-1))
         return (seconds_passed * c)  # [m]
 
-    
-
     def apply_single_band(self, IR, band_num, frequency_range):
+        ''' Applies low/high/bandpass filtering and air absorption attenuation onto a single frequency band. 
+        Decides which kind of pass filtering based on the band number.
+
+        Parameters
+	    ----------
+        IR : 2D ndarray
+            Room impulse response array..
+        band_num : int
+            number of frequency band.
+        frequency_range : float
+            Frequency range of band [Hz]
+        '''
+
         band = frequency_range / self.divisions
 
         # Upper ceiling of each band
@@ -50,7 +98,9 @@ class AirAbsBandpass(FilterStrategy):
         # Calculating mean frequency of band which determines the attenuation.
         band_mean = (band_max + band_min) / 2
 
-        if self.verbose: print(f"Band {band_num}:\tMin:{band_min}\tMean:{band_mean}\tMax:{band_max}\tBand width:{band_max - band_mean}")
+        if self.verbose:
+            print(
+                f"Band {band_num}:\tMin:{band_min}\tMean:{band_mean}\tMax:{band_max}\tBand width:{band_max - band_mean}")
 
         # Prepare + apply bandpass filter
         if band_num == 1:
@@ -76,14 +126,18 @@ class AirAbsBandpass(FilterStrategy):
 
         return filtered_signal
 
-    
-
     def air_absorption_bandpass(self, IR):
-        '''
-        Creates a multi processing pool and calls methods to apply bandpass based air absorption.
+        ''' Creates a multi processing pool and calls methods to apply bandpass based air absorption.
+        
+        Parameters
+	    ----------
+        IR : 2D ndarray
+            Room impulse response array.
 
-        :param IR Room impulse response array.
-        :return Processed IR array.
+        Returns
+	    -------
+        2D ndarray
+            Processed IR array.
         '''
         if self.visualize:
             plt.xscale('log')
@@ -100,7 +154,8 @@ class AirAbsBandpass(FilterStrategy):
         frequency_range = self.max_frequency - self.min_frequency
 
         if not self.visualize:
-            if self.verbose: print("Processed bands are out of order due to multi-processing.")
+            if self.verbose:
+                print("Processed bands are out of order due to multi-processing.")
             # Divide frequency range into defined frequency bands
             filtered_signals = pool.starmap(self.apply_single_band,
                                             ((IR, j, frequency_range)
@@ -119,4 +174,17 @@ class AirAbsBandpass(FilterStrategy):
         return np.add(0, arr.sum(axis=0))
 
     def apply(self, IR):
+        '''
+        Calls method to apply air absorption to RIR using bandpass filtering.
+
+        Parameters
+	    ----------
+        IR : 2D ndarray
+            Room impulse response array.
+
+        Returns
+	    -------
+        2D ndarray
+            Processed IR array.
+        '''
         return self.air_absorption_bandpass(IR)

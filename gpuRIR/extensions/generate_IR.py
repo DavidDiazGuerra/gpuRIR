@@ -18,24 +18,30 @@ from gpuRIR.extensions.create_spectrogram import create_spectrogram_from_file
 import gpuRIR.extensions.room_parameters as rp
 from gpuRIR.extensions.generate_RIR import generate_RIR
 from gpuRIR.extensions.create_spectrogram import *
-# TODO: optimize imports
 
 
-"""
-Generates an impulse response WAV file (IR) with optional filters.
+""" Generates an impulse response WAV file (IR) with optional filters.
 Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
 TODO: Update doc
 """
 
 
 def mono_adaptive_gain(source, bit_depth, ceiling):
-    '''
-    Increases amplitude (loudness) to defined ceiling.
+    ''' Increases amplitude (loudness) to defined ceiling.
 
-    :param list source: Sound data to process.
-    :param int bit_depth: Bit depth of source sound data.
-    :param int ceiling: Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to
-    :return: Amplified source sound data.
+    Parameters:
+    ----------- 
+    source : 2D ndarray
+        Sound data to process.
+    bit_depth : int
+        Bit depth of source sound data.
+    ceiling : int
+        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to
+
+    Returns
+    -------
+    2D ndarray
+        Amplified source sound data.
     '''
     peak = np.max(source)
     negative_peak = np.abs(np.min(source))
@@ -51,14 +57,23 @@ def mono_adaptive_gain(source, bit_depth, ceiling):
 
 
 def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
-    '''
-    Increases amplitude (loudness) to defined ceiling.
+    ''' Increases amplitude (loudness) to defined ceiling.
 
-    :param list source_l: Left channel sound data to process.
-    :param list source_r: Right channel sound data to process.
-    :param int bit_depth: Bit depth of source sound data.
-    :param int ceiling: Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to
-    :return: Amplified source sound data.
+    Parameters:
+    ----------- 
+    source_l : 2D ndarray
+        Left channel sound data to process.
+    source_r : 2D ndarray
+        Right channel sound data to process.
+    bit_depth : int 
+        Bit depth of source sound data.
+    ceiling : float
+        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to [dB]
+    
+    Returns
+    -------
+    2D ndarray
+        Amplified source sound data.
     '''
     # Read out positive and negative peak values
     peak_l = np.max(source_l)
@@ -82,13 +97,24 @@ def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
 
 
 def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True,  visualize=False, verbose=False):
-    '''
-    Generates an IR file out of given source sound data and an optional array of filters to be applied.
+    ''' Generates a mono IR file out of given source sound data and an optional array of filters to be applied.
 
-    :param list source: Sound data to be converted into an impulse response file.
-    :param list filters: List of filters to be applied (in that order)
-
-    TODO: Update doc
+    Parameters:
+    ----------- 
+    source : 2D ndarray
+        Sound data to be converted into an impulse response file.
+    filters : list
+        List of filters to be applied (in that order)
+    bit_depth : int
+        Bit depth of source sound data.
+    fs : int
+        Sampling rate [Hz]
+    enable_adaptive_gain : bool, optional
+        Enables adaptive gain, amplifying the sound data to a defined ceiling value.
+    visualize : bool, optional
+        Enables waveform and spectrogram plots.
+    verbose : bool, optional
+        Terminal logging for benchmarking, debugging and further info.
     '''
     # Prepare sound data arrays.
     source_signal = np.copy(source)
@@ -130,16 +156,34 @@ def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True, 
         plt.plot(impulseResponseArray)
         plt.show()
 
+    pass
+
 
 def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, enable_adaptive_gain=True, verbose=False, visualize=False):
-    '''
-    Generates an IR file out of given source sound data and an optional array of filters to be applied.
+    ''' Generates a stereo IR file out of given source sound data and an optional array of filters to be applied.
 
-    :param list source: Sound data to be converted into an impulse response file.
-    :param list filters: List of filters to be applied (in that order)
-
-    TODO: Update doc
+    Parameters:
+    ----------- 
+    source_r : 2D ndarray
+        Right channel sound data to be converted into an impulse response file.
+    source_l : 2D ndarray
+        Left channel sound data to be converted into an impulse response file.
+    filters_r : list
+        List of right channel filters to be applied (in that order)
+    filters_l : list
+        List of left channel filters to be applied (in that order)
+    bit_depth : int
+        Bit depth of source sound data.
+    fs : int
+        Sampling rate [Hz]
+    enable_adaptive_gain : bool, optional
+        Enables adaptive gain, amplifying the sound data to a defined ceiling value.
+    visualize : bool, optional
+        Enables waveform and spectrogram plots.
+    verbose : bool, optional
+        Terminal logging for benchmarking, debugging and further info.
     '''
+
     # Prepare stereo sound data arrays.
     source_signal_r = np.copy(source_r)
     source_signal_l = np.copy(source_l)
@@ -194,3 +238,5 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
         plt.plot(ir_array_r, label="Right channel")
         plt.title("Right channel")
         plt.show()
+    
+    pass

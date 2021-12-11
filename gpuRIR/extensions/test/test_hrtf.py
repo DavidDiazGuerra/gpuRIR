@@ -1,6 +1,7 @@
 from pytest import approx
 import numpy as np
 from gpuRIR.extensions.filters.hrtf_filter import HRTF_Filter
+import matplotlib.pyplot as plt
 
 ANGLE_180 = approx(np.pi)
 
@@ -13,6 +14,7 @@ ANGLE_NEG_45 = approx(-(np.pi / 4))
 ANGLE_135 = approx(3 * (np.pi / 4))
 
 ANGLE_225 = approx(np.pi + (np.pi / 4))
+
 
 def test_azimuth():
     # Front
@@ -132,4 +134,18 @@ def test_elevation():
     pos_rcv = np.array([0, 0, 0])
     head_direction = [1, 0, 0]
     assert HRTF_Filter.calculate_elevation(
-        pos_src, pos_rcv, head_direction) == approx(np.pi * .8524163) 
+        pos_src, pos_rcv, head_direction) == approx(np.pi * .8524163)
+
+    # Above head, head tilted 45 degrees upward
+    pos_src = np.array([1, 1, 2])
+    pos_rcv = np.array([1, 1, 1])
+    head_direction = [0, 1, 1]
+    assert HRTF_Filter.calculate_elevation(
+        pos_src, pos_rcv, head_direction) == ANGLE_45
+
+    # Above head, head tilted 45 degrees down
+    pos_src = np.array([1, 1, 0])
+    pos_rcv = np.array([1, 1, 1])
+    head_direction = [0, 1, -1]
+    assert HRTF_Filter.calculate_elevation(
+        pos_src, pos_rcv, head_direction) == ANGLE_NEG_45

@@ -48,22 +48,22 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     c_iso       speed of sound in humid air (meters/second) according to ISO standard
 
     **********************************************************************
-    
+
     Example='1'
-    
-    
+
+
     f=100   # frequency  in Hz
 
     T=20    # 20 Degrees Celsius
 
     hr=80   # Relative humidity in percentage hr=80 means 80 percent humidity
-             
+
     ps=1    # Is the barometric pressure ratio. Usually, ps=1
-    
+
     # Run the program
     [alpha, alpha_iso, c, c_iso]=air_absorption(f, T, hr, ps)
-    
-    
+
+
     # **********************************************************************
     # 
     # References
@@ -111,7 +111,10 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     # 
     # Please Feel Free to Modify This Program
     #
-    # See Also: Atmosphere (its on the Matlab file exchange    
+    # See Also: Atmosphere (its on the Matlab file exchange)
+    
+    Edward Zechmann (2021). Air Absorption (https://www.mathworks.com/matlabcentral/fileexchange/26835-air-absorption), 
+    MATLAB Central File Exchange. Retrieved December 11, 2021.
     '''
 
     # convert T from Celsius to Kelvin
@@ -135,7 +138,8 @@ def air_absorption(f=100, T=25, hr=50, ps=1):
     ps_ps0 = ps / ps0
 
     h = hr*psat_ps0 / ps_ps0  # h is the humidity in percent molar concentration
-    h_iso = hr*psat_ps0_iso / ps_ps0  # h is the humidity in percent molar concentration
+    # h is the humidity in percent molar concentration
+    h_iso = hr*psat_ps0_iso / ps_ps0
 
     c0 = 331  # c0 is the reference sound speed
     c = (1+0.16*h/100) * c0 * np.sqrt(T/T01)

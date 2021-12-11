@@ -4,7 +4,11 @@ from scipy.signal import spectrogram
 from matplotlib import pyplot as plt
 
 class HRTF_RIR:
+    ''' Head related transfer function room impulse response (HRFT RIR) interface.
+    '''
     def __init__(self):
+        ''' Instantates interface, creates pre-defined azimuth array.
+        '''
         self.azimuths = np.float32([
             -80, -65, -55, -45, -40,
             -35, -30, -25, -20, -15,
@@ -18,13 +22,55 @@ class HRTF_RIR:
         self.hrir = loadmat('gpuRIR/extensions/hrtf/cipic_hrir/hrir_final.mat')
 
     def azimuth_to_idx(self, azimuth):
+        ''' Translates azimuth to idx in order to access CIPIC database.
+
+        Parameters
+        ----------
+        azimuth : float
+            Azimuth value to translate into idx.
+
+        Returns
+        -------
+        float
+            idx
+        '''
         return int(np.argmin(np.abs(self.azimuths - azimuth)))
 
     def elevation_to_idx(self, elevation):
+        ''' Translates elevation to idx in order to access CIPIC database.
+
+        Parameters
+        ----------
+        azimuth : float
+            Elevation value to translate into idx.
+
+        Returns
+        -------
+        float
+            idx
+        '''
         return int(np.argmin(np.abs(self.elevations - elevation)))
 
 
     def get_hrtf_rir(self, elevation, azimuth, channel, visualize=False):
+        """ Retrieves Head related transfer function room impulse response (HRFT RIR)
+        
+        Parameters
+        ----------
+        elevation : float
+            Elevation value between source and receiver.
+        azimuth : float
+            Azimuth value between source and receiver.
+        channel : str
+            Left or right channel, represented as 'l' or 'r'.
+        visualize : bool
+            Visualizes source and receiver in a 3D space.
+
+        Returns
+        -------
+        2D ndarray
+            HRTF RIR
+        """
         hrir_channel = self.hrir['hrir_'+channel][:, self.elevation_to_idx(elevation), :]
 
         if visualize:
