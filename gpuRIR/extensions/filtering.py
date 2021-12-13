@@ -14,15 +14,15 @@ import gpuRIR.extensions.filters.characteristic_models as cm
 import gpuRIR.extensions.filters.air_absorption_calculation as aa
 from gpuRIR.extensions.wall_absorption.materials import Materials as mat
 import gpuRIR.extensions.wall_absorption.freq_dep_abs_coeff as fdac
-from gpuRIR.extensions.create_spectrogram import create_spectrogram_from_file
+from gpuRIR.extensions.create_spectrogram import create_spectrogram_from_data
 import gpuRIR.extensions.room_parameters as rp
 from gpuRIR.extensions.generate_RIR import generate_RIR
-from gpuRIR.extensions.create_spectrogram import *
 
 
 """ Generates an impulse response WAV file (IR) with optional filters.
 Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
 """
+
 
 def mono_adaptive_gain(source, bit_depth, ceiling):
     ''' Increases amplitude (loudness) to defined ceiling. Operates in an adaptive manner to prevent clipping.
@@ -67,7 +67,7 @@ def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
         Bit depth of source sound data.
     ceiling : float
         Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to [dB]
-    
+
     Returns
     -------
     2D ndarray
@@ -94,8 +94,8 @@ def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
     return (source_l * factor, source_r * factor)
 
 
-def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True,  visualize=False, verbose=False):
-    ''' Generates a mono IR file out of given source sound data and an optional array of filters to be applied.
+def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_wave=False, enable_adaptive_gain=False, visualize=False, verbose=False):
+    ''' Filters a mono IR file out of given source sound data and an optional array of filters to be applied.
 
     Parameters:
     ----------- 
@@ -107,6 +107,10 @@ def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True, 
         Bit depth of source sound data.
     fs : int
         Sampling rate [Hz]
+    filename_appendix : str, optional
+        Filename appendix to indicate which processing was done to the sound data before it reaches this method.
+    write_wave : bool, optional
+        Writes IR wave file for convolving signals yourself.
     enable_adaptive_gain : bool, optional
         Enables adaptive gain, amplifying the sound data to a defined ceiling value.
     visualize : bool, optional
@@ -120,8 +124,7 @@ def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True, 
         Filtered IR sound data (array of samples)
     '''
     # Prepare sound data arrays.
-    source_signal = np.copy(source)
-    filename_appendix = ""
+    source_signal = [np.copy(source)]
 
     # Apply filters
     for i in range(len(filters)):
@@ -142,28 +145,29 @@ def generate_mono_IR(source, filters, bit_depth, fs, enable_adaptive_gain=True, 
         IR_array = mono_adaptive_gain(
             IR_array, bit_depth, 3)
 
-    # Create stereo file (dual mono)
-    IR_array_concatenated = np.concatenate(
-        (IR_array, IR_array), axis=1)
-    
-    # Write impulse response file
-    filename = f'IR_{filename_appendix}_{time.time()}.wav'
-    wavfile.write(filename, fs, IR_array_concatenated.astype(bit_depth))
+    if write_wave:
+        # Create stereo file (dual mono)
+        IR_array_concatenated = np.concatenate(
+            (IR_array, IR_array), axis=1)
+
+        # Write impulse response file
+        filename = f'IR_{filename_appendix}_{time.time()}.wav'
+        wavfile.write(filename, fs, IR_array_concatenated.astype(bit_depth))
 
     if visualize:
         # Create spectrogram
-        create_spectrogram_from_file(filename, filename_appendix)
+        create_spectrogram_from_data(IR_array[0], fs, "Mono", filename_appendix)
 
         # Visualize waveform of IR
         # plt.title(filename_appendix)
-        plt.plot(IR_array)
+        plt.plot(IR_array[0])
         plt.show()
 
     return IR_array
 
 
-def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, enable_adaptive_gain=True, verbose=False, visualize=False):
-    ''' Generates a stereo IR file out of given source sound data and an optional array of filters to be applied.
+def filter_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, filename_appendix="", write_wave=False, enable_adaptive_gain=False, verbose=False, visualize=False):
+    ''' Filters a stereo IR file out of given source sound data and an optional array of filters to be applied.
 
     Parameters:
     ----------- 
@@ -179,6 +183,10 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
         Bit depth of source sound data.
     fs : int
         Sampling rate [Hz]
+    filename_appendix : str, optional
+        Filename appendix to indicate which processing was done to the sound data before it reaches this method.
+    write_wave : bool, optional
+        Writes IR wave file for convolving signals yourself.
     enable_adaptive_gain : bool, optional
         Enables adaptive gain, amplifying the sound data to a defined ceiling value.
     visualize : bool, optional
@@ -197,7 +205,6 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
     # Prepare stereo sound data arrays.
     source_signal_r = np.copy(source_r)
     source_signal_l = np.copy(source_l)
-    filename_appendix = ""
 
     # Apply filters for both stereo channels
     for i in range(len(filters_r)):
@@ -229,24 +236,27 @@ def generate_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, 
         IR_array_l, IR_array_r = stereo_adaptive_gain(
             IR_array_l, IR_array_r, bit_depth, 3)
 
-    # Create stereo file (dual mono)
-    IR_array_concatenated = np.concatenate(
-        (IR_array_l, IR_array_r), axis=1)
+    # Put both stereo channels together
+    IR_array_concatenated = np.concatenate((IR_array_l, IR_array_r), axis=1)
 
-    # Write impulse response file
-    filename = f'IR_{filename_appendix}_{time.time()}.wav'
-    wavfile.write(filename, fs, IR_array_concatenated.astype(bit_depth))
+    if write_wave:
+        # Write impulse response file
+        filename = f'IR_{filename_appendix}_{time.time()}.wav'
+        wavfile.write(filename, fs, IR_array_concatenated.astype(bit_depth))
 
     if visualize:
         # Create spectrogram
-        create_spectrogram_from_data(IR_array_concatenated, fs, filename_appendix)
+        create_spectrogram_from_data(
+            IR_array_l[0], fs, "Left", filename_appendix)
+        create_spectrogram_from_data(
+            IR_array_r[0], fs, "Right", filename_appendix)
 
         # Visualize waveform of IR
-        plt.plot(IR_array_l, label="Left channel")
+        plt.plot(IR_array_l[0], label="Left channel")
         plt.title("Left channel")
         plt.show()
-        plt.plot(IR_array_r, label="Right channel")
+        plt.plot(IR_array_r[0], label="Right channel")
         plt.title("Right channel")
         plt.show()
-    
+
     return IR_array_r, IR_array_l
