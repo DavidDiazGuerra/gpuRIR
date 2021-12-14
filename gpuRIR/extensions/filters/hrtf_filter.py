@@ -211,7 +211,7 @@ class HRTF_Filter(FilterStrategy):
         hrir_channel = self.hrtf_rir.get_hrtf_rir(
             elevation, azimuth, self.channel)
 
-        return np.convolve(IR[0], hrir_channel, mode='same')
+        return np.convolve(IR, hrir_channel, mode='same')
 
     def apply(self, IR):
         ''' Calls method to apply HRTF filtering on the source data.

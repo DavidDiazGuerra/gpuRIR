@@ -124,7 +124,7 @@ def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_w
         Filtered IR sound data (array of samples)
     '''
     # Prepare sound data arrays.
-    source_signal = [np.copy(source)]
+    source_signal = np.copy(source)
 
     # Apply filters
     for i in range(len(filters)):
@@ -147,20 +147,20 @@ def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_w
 
     if write_wave:
         # Create stereo file (dual mono)
-        IR_array_concatenated = np.concatenate(
-            (IR_array, IR_array), axis=1)
+        IR_array_concatenated = np.concatenate((IR_array, IR_array), axis=1)
 
         # Write impulse response file
-        filename = f'IR_{filename_appendix}_{time.time()}.wav'
+        filename = f'IR_mono_{filename_appendix}_{time.time()}.wav'
         wavfile.write(filename, fs, IR_array_concatenated.astype(bit_depth))
 
     if visualize:
         # Create spectrogram
-        create_spectrogram_from_data(IR_array[0], fs, "Mono", filename_appendix)
+        create_spectrogram_from_data(
+            source_signal, fs, "Mono", filename_appendix)
 
         # Visualize waveform of IR
         # plt.title(filename_appendix)
-        plt.plot(IR_array[0])
+        plt.plot(source_signal)
         plt.show()
 
     return IR_array
@@ -241,21 +241,21 @@ def filter_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, fi
 
     if write_wave:
         # Write impulse response file
-        filename = f'IR_{filename_appendix}_{time.time()}.wav'
+        filename = f'IR_stereo_{filename_appendix}_{time.time()}.wav'
         wavfile.write(filename, fs, IR_array_concatenated.astype(bit_depth))
 
     if visualize:
         # Create spectrogram
         create_spectrogram_from_data(
-            IR_array_l[0], fs, "Left", filename_appendix)
+            source_signal_l, fs, "Left", filename_appendix)
         create_spectrogram_from_data(
-            IR_array_r[0], fs, "Right", filename_appendix)
+            source_signal_r, fs, "Right", filename_appendix)
 
         # Visualize waveform of IR
-        plt.plot(IR_array_l[0], label="Left channel")
+        plt.plot(source_signal_l, label="Left channel")
         plt.title("Left channel")
         plt.show()
-        plt.plot(IR_array_r[0], label="Right channel")
+        plt.plot(source_signal_r, label="Right channel")
         plt.title("Right channel")
         plt.show()
 

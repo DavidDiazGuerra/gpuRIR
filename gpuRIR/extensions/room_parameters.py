@@ -59,10 +59,10 @@ class RoomParameters:
                 "bidir": Bidirectional, a.k.a. figure 8.
 	    T60 : float
 		    Reverberation time of the room (seconds to reach 60dB attenuation).
-        att_diff : 
-            TODO
-        att_max : 
-            TODO
+        att_diff : float
+            Attenuation when start using the diffuse reverberation model [dB]
+        att_max : float
+            Attenuation at the end of the simulation [dB]
         fs : float
             RIRs sampling frequency (in Hertz).
         bit_depth : int
