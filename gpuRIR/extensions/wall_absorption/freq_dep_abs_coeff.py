@@ -14,8 +14,19 @@ from gpuRIR.extensions.filters.butterworth import Butterworth
 
 
 def interpolate_pair(abs_coeff, visualize):
-    """
-    Interpolates frequency response array. Returns a function.
+    """Interpolates frequency response array. Returns a function.
+    
+    Parameters
+    ----------
+    abs_coeff : 2D ndarray
+        Per-frequency-range absorption coefficient of a virtual wall material, as (pre-) defined in extensions/wall_absorption/materials.py.
+    visualize : bool
+        Plots the interpolated frequency responses on a 2D graph.
+
+    Returns
+    -------
+    functions
+        Interpolation function of a single virtual room material as (pre-) defined in extensions/wall_absorption/materials.py.
     """
     # y: absorption coefficient
     # x: frequency [Hz]
@@ -33,14 +44,29 @@ def interpolate_pair(abs_coeff, visualize):
 
 
 def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=False, visualize=False, verbose=False):
-    """
-    params:             gpuRIR parameters
-    band_width:         Initial width of frequency band. Lower means higher quality but less performant. (recommended: 10)
-    factor:             Multiplication factor of frequency band. Lower means higher quality but less performant. (recommended: 1.1)
-    order:              Butterworth filter order.
-    LR:                 Uses Linkwitz-Riley filtering. LR filter order will get converted automatically.
-    plot:               Plots the interpolated material frequency response curve.
-    verbose:            Prints current band parameters.
+    """ Generates a custom room impulse response (RIR) with virtual room materials applied using a bandpassing method.
+
+    Parameters:
+    -----------
+    params : RoomParameters
+        gpuRIR parameters
+    band_width : int, optional
+        Initial width of frequency band. Lower means higher quality but less performant. (recommended: 10)
+    factor : float, optional
+        Multiplication factor of frequency band. Lower means higher quality but less performant. (recommended: 1.1)
+    order : int, optional
+        Butterworth filter order.
+    LR : bool, optional
+        Enables Linkwitz-Riley filtering. LR filter order will get converted automatically.
+    plot : bool, optional
+        Plots the interpolated material frequency response curve.
+    verbose : bool, optional
+        Prints current band parameters.
+
+    Returns
+    -------
+    2D ndarray
+        Processed Room impulse response array.
     """
 
     assert(band_width > 1), "Band width must be greater than 1!"

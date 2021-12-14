@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 
 
 class BinauralReceiver():
-    '''
-    TODO: Doc
+    ''' Binaural receiver in a 3D space (two sound receivers in a room, representing human hearing).
     '''
 
     HEAD_WIDTH = 0.1449  # [m]
@@ -14,6 +13,17 @@ class BinauralReceiver():
     PINNA_OFFSET_BACK = 0.0046  # [m]
 
     def __init__(self, head_position, head_direction, verbose=False):
+        ''' Instantiates a binaural receivers in a 3D space.
+
+        Parameters
+        ----------
+        head_position : 3D ndarray
+            Position of head in 3D space.
+        head_direction : 3D ndarray
+            Direction the head is pointing towards in the 3D space.
+        verbose : bool, optional
+            Terminal output for debugging or further information.
+        '''
         assert(head_direction[0] != 0 or head_direction[1] != 0), \
             "Ear directions are undefined for head pointing straight up or down! Try tilting a bit"
         self.position = head_position
@@ -22,11 +32,17 @@ class BinauralReceiver():
 
     @staticmethod
     def find_spine_vector(head_direction):
-        '''
-        Finding a vector going down 90° from head direction (direction of spine).
+        ''' Finding a vector going down 90° from head direction (direction of spine).
 
-        :param head_direction Direction the head is pointing towards.
-        :returns New vector pointing down 90° from head direction (direction of spine).
+        Parameters
+        ----------
+        head_direction : 3D ndarray
+            Direction the head is pointing towards in the 3D space.
+        
+        Returns
+        -------
+        3D ndarray
+            New vector pointing down 90° from head direction (direction of spine).
         '''
         h = np.copy(head_direction)
         if h[2] == 0:
@@ -39,12 +55,19 @@ class BinauralReceiver():
 
     @staticmethod
     def rotate_z_plane(vec, angle):
-        '''
-        Rotates the Z plane of a vector by given angle.
+        ''' Rotates the Z plane of a vector by given angle.
 
-        :param vec Vector to turn.
-        :param angle Angle the vector is being turned.
-        :returns Rotated vector.
+        Parameters
+        ----------
+        vec : 3D ndarray
+            Vector to turn.
+        angle : float
+            Angle the vector is being turned.
+        
+        Returns
+        -------
+        3D ndarray
+            Rotated vector.
         '''
         vec_copy = np.copy(vec)
 
@@ -58,9 +81,16 @@ class BinauralReceiver():
         return vec_copy @ z_rotation
 
     def update(self, head_position, head_direction, verbose=False):
-        '''
-        Updates head position & direction in 3D space, calculates left and right ear position.
-        TODO: Define paramenters
+        ''' Updates head position & direction in 3D space, calculates left and right ear position.
+
+        Parameters
+        ----------
+        head_position : 3D ndarray
+            Position of head in 3D space.
+        head_direction : 3D ndarray
+            Direction the head is pointing towards in the 3D space.
+        verbose : bool, optional
+            Terminal output for debugging or further information.
         '''
         self.position = head_position
         self.direction = head_direction
@@ -96,9 +126,19 @@ class BinauralReceiver():
             print(f"Ear offset down: {ear_offset_down}")
             print(f"Ear offset back: {ear_offset_back}")
 
+        pass
+
     def visualize(self, room_sz, pos_src, orV_src):
-        '''
-        TODO: Doc
+        ''' Visualizes signal source and receiver on a 3D plot.
+
+        Parameters
+        ----------
+        room_sz : 3D ndarray
+            Size of 3D room.
+        pos_src : 3D ndarray
+            Position of sorce in 3D space.
+        orV_src : 3D ndarray
+            Steering vector of source, determines which direction the source is pointing towards.
         '''
         ax = plt.figure().add_subplot(projection='3d')
         np.meshgrid(
@@ -130,3 +170,5 @@ class BinauralReceiver():
 
         plt.legend()
         plt.show()
+
+        pass

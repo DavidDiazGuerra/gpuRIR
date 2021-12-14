@@ -4,7 +4,7 @@ Expands the functionality of gpuRIR by multiple optional extensions, listed as f
 * Air absorption (via Bandpassing or STFT)
 * Source and receiver characteristics (virtual mic / speaker models
 * Binaural receiver (two receivers in room)
-* Head-related transfer function (simulated human hearing)
+* Head-related transfer function (HRTF, simulated human hearing)
 * Room parameter class for gpuRIR (consolidating and automatically calculating parameters)
 * Easy impulse response (IR) file generation with stereo support
 

@@ -2,40 +2,93 @@ from scipy.signal import butter, sosfreqz, sosfilt
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 class Butterworth():
-    
+    ''' Encapsulates Butterworth/Linkwitz Riley functionality with visualization.
+    '''
+
     @staticmethod
     def create_bandpass_filter(lowcut, highcut, fs, order, visualize=False):
+        ''' Returns a butterworth bandpass filter.
+
+        Parameters
+	    ----------
+        lowcut : int
+            Lower bound of bandpass. [Hz]
+        highcut : int
+            Upper bound of bandpass. [Hz]
+        fs : int
+            Sample rate. [Hz]
+        order : int
+            Order of Butterworth filter.
+        visualize : bool, optional
+            Plots band divisions in a graph.
+
+        Returns
+	    -------
+        ndarray
+            Second order sections of IIR filter.
         '''
-        Returns a butterworth bandpass filter.
-        :param lowcut Lower bound of bandpass
-        :param highcut Upper bound of bandpass.
-        :fs Sample rate
-        :order Order of Butterworth filter.
-        :returns sos.
-        '''
-        sos = butter(order, [lowcut, highcut], btype='bandpass', fs=fs, output='sos')
+        sos = butter(order, [lowcut, highcut],
+                     btype='bandpass', fs=fs, output='sos')
         if visualize:
             w, h = sosfreqz(sos, fs=fs)
             plt.plot(w, 20*np.log10(np.abs(h)+1e-7))
         return sos
 
-    
     @staticmethod
-    def apply_bandpass_filter(data, lowcut, highcut, fs, order, LR = False, visualize = False):
+    def apply_bandpass_filter(data, lowcut, highcut, fs, order, LR=False, visualize=False):
+        ''' Applies a butterworth bandpass filter.
+
+        Parameters
+	    ----------
+        lowcut : int
+            Lower bound of bandpass. [Hz]
+        highcut : int
+            Upper bound of bandpass. [Hz]
+        fs : int
+            Sample rate. [Hz]
+        order : int
+            Order of Butterworth filter.
+        LR : bool 
+            Enables Linkwitz-Riley filter.
+        visualize : bool, optional
+            Plots band divisions in a graph.
+        
+        Returns
+	    -------
+        ndarray
+            y Filtered sound data.
         '''
-        Applies a butterworth bandpass filter.
-        '''
-        sos = Butterworth.create_bandpass_filter(lowcut, highcut, fs, order, visualize)
+        sos = Butterworth.create_bandpass_filter(
+            lowcut, highcut, fs, order, visualize)
         y = sosfilt(sos, data)
-        if LR: y = sosfilt(sos, data) # Filter once again for Linkwitz-Riley filtering
+        if LR:
+            # Filter once again for Linkwitz-Riley filtering
+            y = sosfilt(sos, data)
         return y
 
-    
     @staticmethod
     def create_pass_filter(cut, fs, pass_type, order, visualize=False):
-        '''
-        Returns a butterworth lowpass filter.
+        ''' Returns a butterworth filter.
+
+        Parameters
+	    ----------
+        cut : int
+            Cut frequency [Hz]
+        fs : int
+            Sample rate. [Hz]
+        pass_type : str
+            Type of butterworth filter (e.g. 'lowpass' or 'highpass').
+        order : int
+            Order of Butterworth filter.
+        visualize : bool, optional
+            Plots band divisions in a graph.
+
+        Returns
+	    -------
+        ndarray
+            Second order section of butterworth filter.
         '''
         sos = butter(order, cut, btype=pass_type, fs=fs, output='sos')
 
@@ -44,11 +97,27 @@ class Butterworth():
             plt.plot(w, 20*np.log10(np.abs(h)+1e-7))
         return sos
 
-
     @staticmethod
     def apply_pass_filter(data, cut, fs, pass_type, order, visualize=False):
-        '''
-        Applies a butterworth lowpass filter.
+        ''' Applies a butterworth filter.
+
+        Parameters
+	    ----------
+        cut : int
+            Cut frequency [Hz]
+        fs : int
+            Sample rate. [Hz]
+        pass_type : str
+            Type of butterworth filter (e.g. 'lowpass' or 'highpass').
+        order : int
+            Order of Butterworth filter.
+        visualize : bool, optional
+            Plots band divisions in a graph.
+
+        Returns
+	    -------
+        ndarray
+            Second order section of butterworth filter.
         '''
         sos = Butterworth.create_pass_filter(
             cut, fs, pass_type, order=order, visualize=visualize)

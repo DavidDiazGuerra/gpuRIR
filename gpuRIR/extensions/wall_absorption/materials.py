@@ -4,6 +4,10 @@ import numpy as np
 # Wolfgang M. Willems, Kai Schild, Diana Stricker: Formeln und Tabellen Bauphysik. Fourth edition, p. 441.
 
 class Materials:
+    """ Virtual room material characteristics, represented as 2D array, built on frequency-attenuation value pairs.
+    """
+
+
     # Building materials
     concrete = np.array([
         [125, 0.02],
