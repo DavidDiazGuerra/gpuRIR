@@ -5,6 +5,10 @@ from matplotlib import pyplot as plt
 
 class HRTF_RIR:
     ''' Head related transfer function room impulse response (HRFT RIR) interface.
+    
+    Reference: Algazi V.R., Duda R.O., Thompson D.M. and Avendano C. The CIPIC
+    HRTF database. In Proceedings of the 2001 IEEE Workshop on the Applications of
+    Signal Processing to Audio and Acoustics (Cat. No.01TH8575) (2001), pp. 99–102.
     '''
     def __init__(self):
         ''' Instantates interface, creates pre-defined azimuth array.

@@ -6,7 +6,7 @@ from scipy import signal
 
 
 def create_spectrogram_from_file(inner_file_path, title="", channel_count=1):
-    """ Creates a spectrogram from a provided file.
+    """ Shows a spectrogram from a provided file.
 
     Parameters
     ----------
@@ -33,7 +33,7 @@ def create_spectrogram_from_file(inner_file_path, title="", channel_count=1):
 
 
 def create_spectrogram_from_data(source, fs, channel_name="", title=""):
-    """ Creates a spectrogram from a provided file.
+    """ Shows a spectrogram from a provided file.
 
     Parameters
     ----------

@@ -6,6 +6,10 @@ from gpuRIR.extensions.hrtf.hrtf_rir import HRTF_RIR
 
 class HRTF_Filter(FilterStrategy):
     ''' Head related transfer function to simulate psychoacoustic effects of a human head and upper body.
+    
+    Reference: Algazi V.R., Duda R.O., Thompson D.M. and Avendano C. The CIPIC
+    HRTF database. In Proceedings of the 2001 IEEE Workshop on the Applications of
+    Signal Processing to Audio and Acoustics (Cat. No.01TH8575) (2001), pp. 99–102.
     '''
     # 90 degree angle in radiants
     ANGLE_90 = np.pi/2

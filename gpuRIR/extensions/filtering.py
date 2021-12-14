@@ -34,7 +34,8 @@ def mono_adaptive_gain(source, bit_depth, ceiling):
     bit_depth : int
         Bit depth of source sound data.
     ceiling : int
-        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to
+        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to. [dB]
+        This way, the loudest sample will result being the ceiling in dB (eg. -1dB)
 
     Returns
     -------
@@ -66,7 +67,8 @@ def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
     bit_depth : int 
         Bit depth of source sound data.
     ceiling : float
-        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to [dB]
+        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to. [dB]
+        This way, the loudest sample will result being the ceiling in dB (eg. -1dB)
 
     Returns
     -------
