@@ -42,7 +42,7 @@ write_IR_file = False
 enable_adaptive_gain = False
 
 # Visualizes waveform and spectrogram of each generated IR file. Depending on filter, additional graphs are drawn.
-visualize = True
+visualize = False
 
 # Prints calculation times and parameter/processing info onto the terminal if True. Needed for benchmarking, debugging and further info.
 verbose = False
@@ -148,7 +148,7 @@ filters_both = [
 
     # Air absorption simulation.
     # Comment either one out
-    AirAbsBandpass(divisions=50, max_frequency=fs/2, LR=True, order=10, use_bandpass_on_borders=False, verbose=verbose, visualize=visualize),
+    # AirAbsBandpass(divisions=50, max_frequency=fs/2, LR=True, order=10, use_bandpass_on_borders=False, verbose=verbose, visualize=visualize),
     # AirAbsSTFT(),
 
     # Mic simulation.
