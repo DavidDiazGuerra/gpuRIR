@@ -65,7 +65,7 @@ Applying air absorption using bandpass or STFT (Short Time Fourier Transformatio
 
 * `gpuRIR/extensions/filters/air_absorption_bandpass.py`
 * `gpuRIR/extensions/filters/air_absorption_calculation.py`
-* `develop/gpuRIR/extensions/filters/air_absorption_stft.py`
+* `gpuRIR/extensions/filters/air_absorption_stft.py`
 
 ### Parameters
 * **f** Frequency of pure tone.

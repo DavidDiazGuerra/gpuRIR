@@ -66,7 +66,7 @@ Room Impulse Responses (RIRs) simulation using the Image Source Method (ISM). Fo
 * **mic_pattern** : *{"omni", "homni", "card", "hypcard", "subcard", "bidir"}, optional.*
 	Polar pattern of the receivers (the same for all of them).
 	* *"omni"* : Omnidireccional (default).
-	* *"homni"*: Half omnidireccional, 1 in front of the microphone, 0 backwards.
+	* *"homni"*: Half omnidirectional, 1 in front of the microphone, 0 backwards.
 	* *"card"*: Cardioid.
 	* *"hypcard"*: Hypercardioid.
 	* *"subcard"*: Subcardioid.
