@@ -43,7 +43,7 @@ def interpolate_pair(abs_coeff, visualize):
     return f
 
 
-def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=False, visualize=False, verbose=False):
+def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=False, use_bandpass_on_borders=False, visualize=False, verbose=False):
     """ Generates a custom room impulse response (RIR) with virtual room materials applied using a bandpassing method.
 
     Parameters:
@@ -58,6 +58,8 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
         Butterworth filter order.
     LR : bool, optional
         Enables Linkwitz-Riley filtering. LR filter order will get converted automatically.
+    use_bandpass_on_borders : bool, optional
+        Uses bandpass instead of high/lowpass filters on lowest and highest band.
     plot : bool, optional
         Plots the interpolated material frequency response curve.
     verbose : bool, optional
@@ -141,12 +143,9 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
         plt.ylim(bottom=-40)
         plt.margins(0, 0.1)
         plt.grid(which='both', axis='both')
-        plt.axvline(100, color='green')
 
     for i in range(len(bands)):
         band = bands[i]
-        if verbose:
-            print(f"Band {i}: {band[0]}")
         abs_coeffs = np.zeros(len(wall_mat_interp))
         for j in range(len(wall_mat_interp)):
             abs_coeffs[j] = wall_mat_interp[j](band[1])
@@ -157,25 +156,27 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
         # Apply band/lowpassing and re-compiling sound data
         for rcv in range(len(params.pos_rcv)):
             # Lowpass lowest frequency band
-            if i == 0:
+            if i == 0 and not use_bandpass_on_borders:
                 processed = Butterworth.apply_pass_filter(
-                    RIR[rcv], band[2], params.fs, 'lowpass', order, visualize
+                    RIR[rcv], band[2], params.fs, 'lowpass', order * 4, visualize
                 )
                 if verbose:
-                    print(f"Lowpass frequency: {band[2]}")
+                    print(f"Lowpass frequency: {band[2]}  Order: {order * 4}")
 
             # Highpass highest frequency band
-            elif i == (len(bands) - 1):
+            elif i == (len(bands) - 1) and not use_bandpass_on_borders:
                 processed = Butterworth.apply_pass_filter(
-                    RIR[rcv], band[0], params.fs, 'highpass', order, visualize
+                    RIR[rcv], band[0], params.fs, 'highpass', order * 4, visualize
                 )
                 if verbose:
-                    print(f"Highpass frequency: {band[0]}")
+                    print(f"Highpass frequency: {band[0]} Order: {order * 4}")
 
             # All other bands are bandpassed
             else:
                 processed = Butterworth.apply_bandpass_filter(
                     RIR[rcv], band[0], band[2], params.fs, order, LR, visualize)
+                if verbose:
+                    print(f"Band {i} Bandpass frequency: {band[0]}  Order: {order}")
 
             # Re-compiling sound data
             receiver_channels.resize(len(params.pos_rcv), len(processed))

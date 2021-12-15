@@ -14,11 +14,11 @@ class AirAbsBandpass(FilterStrategy):
     Splits the frequency bands into defined amount of divisions, applies air absorption and combines the bands back into one RIR.
     '''
 
-    def __init__(self, max_frequency=22050, min_frequency=1, divisions=50, fs=44100, order=4, LR=False, verbose=False, visualize=False):
+    def __init__(self, max_frequency=22050, min_frequency=1, divisions=50, fs=44100, order=4, LR=False, use_bandpass_on_borders=False, verbose=False, visualize=False):
         ''' Instantiates bandpass-driven air absorption.
 
         Parameters
-	    ----------
+            ----------
         max_frequency : int
             Top end of frequency range (High pass cut).
         min_frequency : int
@@ -31,6 +31,8 @@ class AirAbsBandpass(FilterStrategy):
             Order of Butterworth or Linkwitz-Riley filter.
         LR : bool, optional
             Enables Linkwitz-Riley filter.
+        use_bandpass_on_borders : bool, optional
+            Uses bandpass instead of high/lowpass filters on lowest and highest band.
         verbose : bool, optional
             Terminal output for debugging or further information.
         visualize : bool, optional
@@ -41,11 +43,12 @@ class AirAbsBandpass(FilterStrategy):
         self.min_frequency = min_frequency
         self.divisions = divisions
         self.fs = fs
-        self.max_frequency = fs / 2
+        self.max_frequency = max_frequency
         self.order = order
         self.LR = LR
         if LR:
             order = order / 2
+        self.use_bandpass_on_borders = use_bandpass_on_borders
         self.NAME = "bandpass_air_abs"
         self.visualize = visualize
         self.verbose = verbose
@@ -55,7 +58,7 @@ class AirAbsBandpass(FilterStrategy):
         ''' Calculates how much distance the sound has travelled in meters.
 
         Parameters
-	    ----------
+            ----------
         sample_number : int
             How many samples have passed.
         sampling_frequency : int
@@ -64,7 +67,7 @@ class AirAbsBandpass(FilterStrategy):
             Speed of sound. 
 
         Returns
-	    -------
+            -------
             Time passed since first sample [s]
         '''
         seconds_passed = sample_number * (sampling_frequency ** (-1))
@@ -75,7 +78,7 @@ class AirAbsBandpass(FilterStrategy):
         Decides which kind of pass filtering based on the band number.
 
         Parameters
-	    ----------
+            ----------
         IR : 2D ndarray
             Room impulse response array..
         band_num : int
@@ -103,14 +106,17 @@ class AirAbsBandpass(FilterStrategy):
                 f"Band {band_num}:\tMin:{band_min}\tMean:{band_mean}\tMax:{band_max}\tBand width:{band_max - band_mean}")
 
         # Prepare + apply bandpass filter
-        if band_num == 1:
+        if band_num == 1 and not self.use_bandpass_on_borders:
             filtered_signal = Butterworth.apply_pass_filter(
-                IR, band_max, self.fs, 'lowpass', self.order*2, self.visualize
+                IR, band_max, self.fs, 'lowpass', self.order*4, self.visualize
             )
-        elif band_num == self.divisions:
+            if self.verbose: print(f"Lowpass at {band_max}")
+        elif band_num == self.divisions and not self.use_bandpass_on_borders:
             filtered_signal = Butterworth.apply_pass_filter(
-                IR, band_min, self.fs, 'highpass', self.order*2, self.visualize
+                IR, band_min, self.fs, 'highpass', self.order*4, self.visualize
             )
+            if self.verbose: print(f"Highpass at {band_min}")
+
         else:
             filtered_signal = Butterworth.apply_bandpass_filter(
                 IR, band_min, band_max, self.fs, self.order, self.LR, self.visualize)
@@ -128,14 +134,14 @@ class AirAbsBandpass(FilterStrategy):
 
     def air_absorption_bandpass(self, IR):
         ''' Creates a multi processing pool and calls methods to apply bandpass based air absorption.
-        
+
         Parameters
-	    ----------
+            ----------
         IR : 2D ndarray
             Room impulse response array.
 
         Returns
-	    -------
+            -------
         2D ndarray
             Processed IR array.
         '''
@@ -147,7 +153,6 @@ class AirAbsBandpass(FilterStrategy):
             plt.ylim(bottom=-40)
             plt.margins(0, 0.1)
             plt.grid(which='both', axis='both')
-            plt.axvline(100, color='green')
 
         pool = multiprocessing.Pool()
 
@@ -178,12 +183,12 @@ class AirAbsBandpass(FilterStrategy):
         Calls method to apply air absorption to RIR using bandpass filtering.
 
         Parameters
-	    ----------
+            ----------
         IR : 2D ndarray
             Room impulse response array.
 
         Returns
-	    -------
+            -------
         2D ndarray
             Processed IR array.
         '''

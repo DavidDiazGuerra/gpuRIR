@@ -70,7 +70,7 @@ params = rp.RoomParameters(
 # Generate room impulse response (RIR) with given parameters
 if freq_dep_abs_coeff:
     receiver_channels = fdac.generate_RIR_freq_dep_walls(
-        params, LR=True, order=12, band_width=100, factor=1.1, visualize=visualize, verbose=verbose)
+        params, LR=False, order=10, band_width=100, factor=1.1, use_bandpass_on_borders=False, visualize=visualize, verbose=verbose)
     filename_appendix = "freqdep"
 else:
     receiver_channels = gRIR.generate_RIR(params)
@@ -88,7 +88,7 @@ for i in range(len(params.pos_rcv)):
 
         # Air absorption simulation.
         # Comment either one out
-        # AirAbsBandpass(divisions=50, max_frequency=params.fs/2, LR = True, order = 42, verbose = verbose, visualize = visualize),
+        # AirAbsBandpass(divisions=50, max_frequency=params.fs/2, LR=True, order=10, use_bandpass_on_borders=True, verbose=verbose, visualize=visualize),
         # AirAbsSTFT(),
 
         # Mic simulation.
