@@ -14,7 +14,7 @@ class gpuRIR_bind {
 	public:
 		gpuRIR_bind(bool mPrecision=false, bool lut=true) : mixed_precision(mPrecision), lookup_table(lut), gpuRIR_cuda_simulator(mPrecision, lut) {};
 		
-		py::array simulateRIR_bind(std::vector<float>, std::vector<float>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, micPattern, std::vector<int> ,float, float, float, float);
+		py::array simulateRIR_bind(std::vector<float>, std::vector<float>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, polarPattern, polarPattern, std::vector<int> ,float, float, float, float);
 		py::array gpu_conv(py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>);
 		bool activate_mixed_precision_bind(bool);
 		bool activate_lut_bind(bool);
@@ -30,8 +30,10 @@ py::array gpuRIR_bind::simulateRIR_bind(std::vector<float> room_sz, // Size of t
 										std::vector<float> beta, // Reflection coefficients
 										py::array_t<float, py::array::c_style> pos_src, // positions of the sources [m]
 										py::array_t<float, py::array::c_style> pos_rcv, // positions of the receivers [m]
+										py::array_t<float, py::array::c_style> orV_src, // orientation of the sources
 										py::array_t<float, py::array::c_style> orV_rcv, // orientation of the receivers
-										micPattern mic_pattern, // Polar pattern of the receivers (see gpuRIR_cuda.h)
+										polarPattern spkr_pattern, // Polar pattern of the sources (see gpuRIR_cuda.h)
+										polarPattern mic_pattern, // Polar pattern of the receivers (see gpuRIR_cuda.h)
 										std::vector<int> nb_img, // Number of sources in each dimension
 										float Tdiff, // Time when the ISM is replaced by a diffusse reverberation model [s]
 										float Tmax, // RIRs length [s]
@@ -41,6 +43,7 @@ py::array gpuRIR_bind::simulateRIR_bind(std::vector<float> room_sz, // Size of t
 {
 	py::buffer_info info_pos_src = pos_src.request();
 	py::buffer_info info_pos_rcv = pos_rcv.request();
+	py::buffer_info info_orV_src = orV_src.request();
 	py::buffer_info info_orV_rcv = orV_rcv.request();
 	
 	// Check input sizes
@@ -49,17 +52,25 @@ py::array gpuRIR_bind::simulateRIR_bind(std::vector<float> room_sz, // Size of t
 	assert(nb_img.size() == 3);
 	assert(pos_src.ndim == 2);
 	assert(pos_rcv.ndim == 2);
+	assert(orV_src.ndim == 2);
 	assert(orV_rcv.ndim == 2);
 	assert(info_pos_src.shape[1] == 3);
 	assert(info_pos_rcv.shape[1] == 3);
+	assert(info_orV_src.shape[1] == 3);
 	assert(info_orV_rcv.shape[1] == 3);
 	assert(info_pos_rcv.shape[0] == info_orV_rcv.shape[0]);
 	int M_src = info_pos_src.shape[0];
 	int M_rcv = info_pos_rcv.shape[0];
 	
 	float* rir = gpuRIR_cuda_simulator.cuda_simulateRIR(&room_sz[0], &beta[0], 
-														   (float*) info_pos_src.ptr, M_src, 
-														   (float*) info_pos_rcv.ptr, (float*) info_orV_rcv.ptr, mic_pattern, M_rcv, 
+														   (float*) info_pos_src.ptr, 
+														   M_src, 
+														   (float*) info_pos_rcv.ptr, 
+														   (float*) info_orV_src.ptr, 
+														   (float*) info_orV_rcv.ptr, 
+														   spkr_pattern,
+														   mic_pattern, 
+														   M_rcv, 
 														   &nb_img[0], Tdiff, Tmax, Fs, c);
 
 	py::capsule free_when_done(rir, [](void *f) {
@@ -122,7 +133,7 @@ PYBIND11_MODULE(gpuRIR_bind,m)
   py::class_<gpuRIR_bind>(m, "gpuRIR_bind")
         .def(py::init<bool &>(), py::arg("mixed_precision")=false)
         .def("simulateRIR_bind", &gpuRIR_bind::simulateRIR_bind, "RIR simulation", py::arg("room_sz"), py::arg("beta"), py::arg("pos_src"), 
-			 py::arg("pos_rcv"), py::arg("orV_rcv"), py::arg("mic_pattern"), py::arg("nb_img"), py::arg("Tdiff"), py::arg("Tmax"), 
+			 py::arg("pos_rcv"), py::arg("orV_src"), py::arg("orV_rcv"), py::arg("spkr_pattern"), py::arg("mic_pattern"), py::arg("nb_img"), py::arg("Tdiff"), py::arg("Tmax"), 
 			 py::arg("Fs"), py::arg("c")=343.0f )
 		.def("gpu_conv", &gpuRIR_bind::gpu_conv, "Batched convolution using FFTs in GPU", py::arg("source_segments"), py::arg("RIR"))
 		.def("activate_mixed_precision_bind", &gpuRIR_bind::activate_mixed_precision_bind, "Activate the mixed precision mode, only for Pascal GPU architecture or superior",

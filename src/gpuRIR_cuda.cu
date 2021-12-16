@@ -129,7 +129,7 @@ __device__ __forceinline__ float SabineT60( float room_sz_x, float room_sz_y, fl
 	return 0.161f * V / Sa;
 }
 
-__device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3], micPattern pattern) {
+__device__ __forceinline__ float directivity(float doaVec[3], float orVec[3], polarPattern pattern) {
 	if (pattern == DIR_OMNI) return 1.0f;
 	
 	float cosTheta = doaVec[0]*orVec[0] + doaVec[1]*orVec[1] + doaVec[2]*orVec[2];
@@ -142,7 +142,7 @@ __device__ __forceinline__ float mic_directivity(float doaVec[3], float orVec[3]
 		case DIR_HYPCARD:	return 0.25f + 0.75f*cosTheta;
 		case DIR_SUBCARD: 	return 0.75f + 0.25f*cosTheta;
 		case DIR_BIDIR: 	return cosTheta;
-		default: printf("Invalid microphone pattern.\n"); return 0.0f;
+		default: printf("Invalid polar pattern.\n"); return 0.0f;
 	}
 }
 
@@ -245,14 +245,14 @@ __device__ __forceinline__ float image_sample_lut(float amp, float tau, float t,
 __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
 								  float* g_tau /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
 								  float* g_tau_dp /*[M_src]M_rcv]*/,
-								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_rcv/*[M_rcv][3]*/,
-								  micPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
+								  float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_src/*[M_src][3]*/, float* g_orV_rcv/*[M_rcv][3]*/,
+								  polarPattern spkr_pattern, polarPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
 								  float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2, 
 								  int nb_img_x, int nb_img_y, int nb_img_z,
 								  int M_src, int M_rcv, float c, float Fs) {
 	
 	extern __shared__ float sdata[];
-		
+	
 	int n[3];
 	n[0] = blockIdx.x * blockDim.x + threadIdx.x;
 	n[1] = blockIdx.y * blockDim.y + threadIdx.y;
@@ -308,6 +308,16 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 			sh_orV_rcv[m*3+2] = g_orV_rcv[m*3+2];
 		}
 	}
+
+	// Copy g_orV_src to shared memory
+	float* sh_orV_src = &sh_orV_rcv[M_src*3];
+	if (threadIdx.x==0 && threadIdx.y==0)  {
+		for (int m=threadIdx.z; m<M_src; m+=blockDim.z) {
+			sh_orV_src[m*3  ] = g_orV_src[m*3  ];
+			sh_orV_src[m*3+1] = g_orV_src[m*3+1];
+			sh_orV_src[m*3+2] = g_orV_src[m*3+2];
+		}
+	}
 	
 	// Wait until the copies are completed
 	__syncthreads();
@@ -323,7 +333,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		for (int d=0; d<3; d++) {
 			clust_idx[d] = __float2int_ru((n[d] - N[d]/2) / 2.0f); 
 			clust_pos[d] = clust_idx[d] * 2*room_sz[d];
-			rflx_idx[d] = abs((n[d] - N[d]/2) % 2); // 1 means reflected in dimension d
+			rflx_idx[d] = abs((n[d] - N[d]/2) % 2); // checking which dimensions are reflected: 1 means reflected in dimension d
 			rflx_att *= powf(beta[d*2], abs(clust_idx[d]-rflx_idx[d])) * powf(beta[d*2+1], abs(clust_idx[d]));
 			direct_path *= (clust_idx[d]==0)&&(rflx_idx[d]==0);
 		}
@@ -331,19 +341,31 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		// Individual factors for each src and rcv
 		for (int m_src=0; m_src<M_src; m_src++) {
 			for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
-				float vec[3];
+				float vec[3]; // Vector going from rcv to img src
+				float im_src_to_rcv[3]; // for speaker directivity: Vector going from img src to rcv
+				float orV_src[3]; // temporary orV_src to prevent overwriting sh_orV_src
 				float dist = 0;
 				for (int d=0; d<3; d++) {
-					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d];
-					dist += vec[d] * vec[d];
+					// computing the vector going from the rcv to img src
+					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d]; 
+					dist += vec[d] * vec[d]; 
+					
+					// for speaker directivity
+					orV_src[d] = (1-2*rflx_idx[d]) * sh_orV_src[m_src*3+d]; // If rflx_id = 1 => -1 * orV_src. If rflx_id = 0 => 1 * orV_src
+					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin)
 				}
 				dist = sqrtf(dist);
 				float amp = rflx_att / (4*PI*dist);
-				amp *= mic_directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern);
+				amp *= directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern); // apply microphone directivity dampening
+				amp *= directivity(im_src_to_rcv, orV_src, spkr_pattern); // apply speaker directivity dampening
+
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
 
-				if (direct_path) g_tau_dp[m_src*M_rcv + m_rcv] = dist / c * Fs;
+				if (direct_path){
+					g_tau_dp[m_src*M_rcv + m_rcv] = dist / c * Fs;
+					// printf("%f,",amp); // For creating polar pattern diagrams
+				} 
 			}
 		}
 	}
@@ -739,19 +761,23 @@ int gpuRIR_cuda::PadData(float *signal, float **padded_signal, int segment_len,
 /***********************/
 
 float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
-									   float* h_pos_rcv, float* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
+									   float* h_pos_rcv, float* h_orV_src, float* h_orV_rcv, 
+									   polarPattern spkr_pattern, polarPattern mic_pattern, int M_rcv, int nb_img[3],
 									   float Tdiff, float Tmax, float Fs, float c) {	
 	// function float* cuda_simulateRIR(float room_sz[3], float beta[6], float* h_pos_src, int M_src, 
-	//									   float* h_pos_rcv, float* h_orV_rcv, micPattern mic_pattern, int M_rcv, int nb_img[3],
-	//									   float Tdiff, float Tmax, float Fs, float c);
+	//								   float* h_pos_rcv, float* h_orV_src, float* h_orV_rcv, 
+	//								   polarPattern spkr_pattern, polarPattern mic_pattern, int M_rcv, int nb_img[3],
+	//								   float Tdiff, float Tmax, float Fs, float c);
 	// Input parameters:
 	// 	float room_sz[3]		: Size of the room [m]
 	//	float beta[6] 		: Reflection coefficients [beta_x1 beta_x2 beta_y1 beta_y2 beta_z1 beta_z2]
 	//	float* h_pos_src 	: M_src x 3 matrix with the positions of the sources [m]
 	//	int M_src 				: Number of sources
 	//	float* h_pos_rcv 	: M_rcv x 3 matrix with the positions of the receivers [m]
+	//	float* h_orV_src 	: M_rcv x 3 matrix with vectors pointing in the same direction than the source
 	//	float* h_orV_rcv 	: M_rcv x 3 matrix with vectors pointing in the same direction than the receivers
-	//	micPattern mic_pattern 	: Polar pattern of the receivers (see gpuRIR_cuda.h)
+	//	polarPattern spkr_pattern 	: Polar pattern of the sources (see gpuRIR_cuda.h)
+	//	polarPattern mic_pattern 	: Polar pattern of the receivers (see gpuRIR_cuda.h)
 	//	int M_rcv 				: Number of receivers
 	//	int nb_img[3] 			: Number of sources in each dimension
 	//	float Tdiff			: Time when the ISM is replaced by a diffusse reverberation model [s]
@@ -760,12 +786,14 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	//	float c				: Speed of sound [m/s]
 	
 	// Copy host memory to GPU
-	float *pos_src, *pos_rcv, *orV_rcv;
+	float *pos_src, *pos_rcv, *orV_src, *orV_rcv;
 	gpuErrchk( cudaMalloc(&pos_src, M_src*3*sizeof(float)) );
 	gpuErrchk( cudaMalloc(&pos_rcv, M_rcv*3*sizeof(float)) );
+	gpuErrchk( cudaMalloc(&orV_src, M_src*3*sizeof(float)) );
 	gpuErrchk( cudaMalloc(&orV_rcv, M_rcv*3*sizeof(float)) );
 	gpuErrchk( cudaMemcpy(pos_src, h_pos_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	gpuErrchk( cudaMemcpy(pos_rcv, h_pos_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
+	gpuErrchk( cudaMemcpy(orV_src, h_orV_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	gpuErrchk( cudaMemcpy(orV_rcv, h_orV_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	
 	
@@ -785,7 +813,7 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	
 	calcAmpTau_kernel<<<numBlocksISM, threadsPerBlockISM, shMemISM>>> (
 		amp, tau, tau_dp,
-		pos_src, pos_rcv, orV_rcv, mic_pattern,
+		pos_src, pos_rcv, orV_src, orV_rcv, spkr_pattern, mic_pattern,
 		room_sz[0], room_sz[1], room_sz[2], 
 		beta[0], beta[1], beta[2], beta[3], beta[4], beta[5], 
 		nb_img[0], nb_img[1], nb_img[2],
