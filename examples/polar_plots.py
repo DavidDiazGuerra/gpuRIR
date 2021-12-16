@@ -1,5 +1,3 @@
-import gpuRIR.extensions.filters.air_absorption_calculation as aa
-
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -10,9 +8,6 @@ from scipy.io import wavfile
 from scipy import signal
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-import gpuRIR.extensions.room_parameters as rp
-import gpuRIR.extensions.generate_RIR as gRIR
 
 """ 
 Visualizes polar patterns of the source by rotating source by 360, repeatedly calling gpuRIR.
