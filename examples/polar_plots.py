@@ -125,29 +125,29 @@ if __name__ == "__main__":
             rad = degree*np.pi/180
 
             # RIR parameters
-            params = rp.RoomParameters(
-                room_sz=[16, 8, 3],  # Size of the room [m]
-                pos_src=[[4, 4, 1.7]],  # Positions of the sources [m]
-                pos_rcv=[[10, 4, 2]],  # Positions of the receivers [m]
-                # Steering vector of source(s)
-                orV_src=np.matlib.repmat(
-                    np.array([np.cos(rad), np.sin(rad), 0]), 1, 1),
-                # Steering vector of receiver(s)
-                orV_rcv=np.matlib.repmat(np.array([1, 0, 0]), 1, 1),
-                spkr_pattern=POLAR_PATTERNS[p],  # Source polar pattern
-                mic_pattern="omni",  # Receiver polar pattern
-                T60=0.21,  # Time for the RIR to reach 60dB of attenuation [s]
-                # Attenuation when start using the diffuse reverberation model [dB]
-                att_diff=15.0,
-                att_max=60.0,  # Attenuation at the end of the simulation [dB]
-                fs=44100,  # Sampling frequency [Hz]
-                # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
-                bit_depth=np.int32,
-                beta=6*[0.1]
-            )
+            room_sz=[16, 8, 3]  # Size of the room [m]
+            pos_src=np.array([[4, 4, 1.7]])  # Positions of the sources [m]
+            pos_rcv=np.array([[10, 4, 2]])  # Positions of the receivers [m]
+            # Steering vector of source(s)
+            orV_src=np.matlib.repmat(np.array([np.cos(rad), np.sin(rad), 0]), 1, 1)
+            # Steering vector of receiver(s)
+            orV_rcv=np.matlib.repmat(np.array([1, 0, 0]), 1, 1)
+            spkr_pattern=POLAR_PATTERNS[p]  # Source polar pattern
+            mic_pattern="omni"  # Receiver polar pattern
+            T60=0.21  # Time for the RIR to reach 60dB of attenuation [s]
+            # Attenuation when start using the diffuse reverberation model [dB]
+            att_diff=15.0
+            att_max=60.0  # Attenuation at the end of the simulation [dB]
+            fs=44100  # Sampling frequency [Hz]
+            # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
+            bit_depth=np.int32
+            beta=6*[0.1] # Reflection coefficients
+            Tdiff= gpuRIR.att2t_SabineEstimator(att_diff, T60) # Time to start the diffuse reverberation model [s]
+            Tmax = gpuRIR.att2t_SabineEstimator(att_max, T60)	 # Time to stop the simulation [s]
+            nb_img = gpuRIR.t2n( Tdiff, room_sz )	# Number of image sources in each dimension
 
             # Prepare sound data arrays.
-            receiver_channels = gRIR.generate_RIR(params)
+            receiver_channels = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern, orV_src=orV_src, spkr_pattern=spkr_pattern)
 
             # Stack array vertically
             impulseResponseArray = np.vstack(receiver_channels[0])
