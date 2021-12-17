@@ -1,5 +1,3 @@
-import gpuRIR.extensions.filters.air_absorption_calculation as aa
-
 import numpy as np
 import numpy.matlib
 import matplotlib.pyplot as plt
@@ -11,6 +9,7 @@ from scipy import signal
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+import gpuRIR.extensions.filters.air_absorption_calculation as aa
 import gpuRIR.extensions.room_parameters as rp
 import gpuRIR.extensions.generate_RIR as gRIR
 
@@ -148,6 +147,7 @@ if __name__ == "__main__":
 
             # Prepare sound data arrays.
             receiver_channels = gRIR.generate_RIR(params)
+
 
             # Stack array vertically
             impulseResponseArray = np.vstack(receiver_channels[0])
