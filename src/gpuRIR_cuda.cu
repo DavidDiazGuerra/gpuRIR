@@ -310,7 +310,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 	}
 
 	// Copy g_orV_src to shared memory
-	float* sh_orV_src = &sh_orV_rcv[M_src*3];
+	float* sh_orV_src = &sh_orV_rcv[M_rcv*3];
 	if (threadIdx.x==0 && threadIdx.y==0)  {
 		for (int m=threadIdx.z; m<M_src; m+=blockDim.z) {
 			sh_orV_src[m*3  ] = g_orV_src[m*3  ];
@@ -802,7 +802,8 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	dim3 numBlocksISM(ceil((float)nb_img[0] / nThreadsISM_x), 
 					  ceil((float)nb_img[1] / nThreadsISM_y), 
 					  ceil((float)nb_img[2] / nThreadsISM_z));
-	int shMemISM = (M_src + 2*M_rcv) * 3 * sizeof(float);
+	int shMemISM = (2*M_src + 2*M_rcv) * 3 * sizeof(float);
+	// printf("shMemISM: %d\n", shMemISM);
 	
 	float* amp; // Amplitude with which the signals from each image source of each source arrive to each receiver
 	gpuErrchk( cudaMalloc(&amp, M_src*M_rcv*nb_img[0]*nb_img[1]*nb_img[2]*sizeof(float)) );

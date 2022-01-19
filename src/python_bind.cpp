@@ -58,6 +58,7 @@ py::array gpuRIR_bind::simulateRIR_bind(std::vector<float> room_sz, // Size of t
 	assert(info_pos_rcv.shape[1] == 3);
 	assert(info_orV_src.shape[1] == 3);
 	assert(info_orV_rcv.shape[1] == 3);
+	assert(info_pos_src.shape[0] == info_orV_src.shape[0]);
 	assert(info_pos_rcv.shape[0] == info_orV_rcv.shape[0]);
 	int M_src = info_pos_src.shape[0];
 	int M_rcv = info_pos_rcv.shape[0];
