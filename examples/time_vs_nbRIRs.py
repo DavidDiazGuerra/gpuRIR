@@ -12,7 +12,7 @@ import gpuRIR
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
 
-nb_src_vec = np.concatenate([2**np.arange(12), [4094]]) # Number of RIRs to measure
+nb_src_vec = np.concatenate([2**np.arange(12), [4095]]) # Number of RIRs to measure
 nb_test_per_point = 10 # Number of simulations per T60 to average the runtime
 
 nb_rcv = 1 # Number of receivers

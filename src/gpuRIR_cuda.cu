@@ -299,23 +299,26 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		}
 	}
 	
-	// Copy g_orV_rcv to shared memory
-	float* sh_orV_rcv = &sh_pos_rcv[M_rcv*3];
-	if (threadIdx.x==0 && threadIdx.y==0)  {
-		for (int m=threadIdx.z; m<M_rcv; m+=blockDim.z) {
-			sh_orV_rcv[m*3  ] = g_orV_rcv[m*3  ];
-			sh_orV_rcv[m*3+1] = g_orV_rcv[m*3+1];
-			sh_orV_rcv[m*3+2] = g_orV_rcv[m*3+2];
+	// Copy g_orV_src and g_orV_rcv to shared memory
+	float *sh_orV_src, *sh_orV_rcv;
+	sh_orV_src = &sh_pos_rcv[M_rcv*3];
+	if (spkr_pattern != DIR_OMNI) {
+		if (threadIdx.x==0 && threadIdx.y==0)  {
+			for (int m=threadIdx.z; m<M_src; m+=blockDim.z) {
+				sh_orV_src[m*3  ] = g_orV_src[m*3  ];
+				sh_orV_src[m*3+1] = g_orV_src[m*3+1];
+				sh_orV_src[m*3+2] = g_orV_src[m*3+2];
+			}
 		}
-	}
-
-	// Copy g_orV_src to shared memory
-	float* sh_orV_src = &sh_orV_rcv[M_src*3];
-	if (threadIdx.x==0 && threadIdx.y==0)  {
-		for (int m=threadIdx.z; m<M_src; m+=blockDim.z) {
-			sh_orV_src[m*3  ] = g_orV_src[m*3  ];
-			sh_orV_src[m*3+1] = g_orV_src[m*3+1];
-			sh_orV_src[m*3+2] = g_orV_src[m*3+2];
+		sh_orV_rcv = &sh_orV_src[M_rcv*3];
+	}  else sh_orV_rcv = sh_orV_src;
+	if (mic_pattern != DIR_OMNI) {
+		if (threadIdx.x==0 && threadIdx.y==0)  {
+			for (int m=threadIdx.z; m<M_rcv; m+=blockDim.z) {
+				sh_orV_rcv[m*3  ] = g_orV_rcv[m*3  ];
+				sh_orV_rcv[m*3+1] = g_orV_rcv[m*3+1];
+				sh_orV_rcv[m*3+2] = g_orV_rcv[m*3+2];
+			}
 		}
 	}
 	
@@ -333,7 +336,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		for (int d=0; d<3; d++) {
 			clust_idx[d] = __float2int_ru((n[d] - N[d]/2) / 2.0f); 
 			clust_pos[d] = clust_idx[d] * 2*room_sz[d];
-			rflx_idx[d] = abs((n[d] - N[d]/2) % 2); // checking which dimensions are reflected: 1 means reflected in dimension d
+			rflx_idx[d] = abs((n[d] - N[d]/2) % 2); // checking which dimensions are reflected: 1 means reflected in dimension d
 			rflx_att *= powf(beta[d*2], abs(clust_idx[d]-rflx_idx[d])) * powf(beta[d*2+1], abs(clust_idx[d]));
 			direct_path *= (clust_idx[d]==0)&&(rflx_idx[d]==0);
 		}
@@ -341,23 +344,23 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 		// Individual factors for each src and rcv
 		for (int m_src=0; m_src<M_src; m_src++) {
 			for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
-				float vec[3]; // Vector going from rcv to img src
-				float im_src_to_rcv[3]; // for speaker directivity: Vector going from img src to rcv
-				float orV_src[3]; // temporary orV_src to prevent overwriting sh_orV_src
+				float vec[3]; // Vector going from rcv to img src
+				float im_src_to_rcv[3]; // For speaker directivity: Vector going from img src to rcv
+				float orV_src[3]; // Temporary orV_src to prevent overwriting sh_orV_src
 				float dist = 0;
 				for (int d=0; d<3; d++) {
-					// computing the vector going from the rcv to img src
-					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d]; 
+					// Computing the vector going from the rcv to img src
+					vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d];
 					dist += vec[d] * vec[d]; 
 					
-					// for speaker directivity
-					orV_src[d] = (1-2*rflx_idx[d]) * sh_orV_src[m_src*3+d]; // If rflx_id = 1 => -1 * orV_src. If rflx_id = 0 => 1 * orV_src
-					im_src_to_rcv[d] = -vec[d]; // change vector direction (mirror through origin)
+					// For speaker directivity
+					if (spkr_pattern != DIR_OMNI) orV_src[d] = (1-2*rflx_idx[d]) * sh_orV_src[m_src*3+d]; // If rflx_id=1 =>-1 *orV_src. If rflx_id= 0 => 1 * orV_src
+					im_src_to_rcv[d] = -vec[d]; //change vector direction (mirror through origin)
 				}
 				dist = sqrtf(dist);
 				float amp = rflx_att / (4*PI*dist);
-				amp *= directivity(vec, &sh_orV_rcv[m_rcv], mic_pattern); // apply microphone directivity dampening
-				amp *= directivity(im_src_to_rcv, orV_src, spkr_pattern); // apply speaker directivity dampening
+				if (spkr_pattern != DIR_OMNI) amp *= directivity(im_src_to_rcv, orV_src, spkr_pattern); // Apply speaker directivity dampening
+				if (mic_pattern  != DIR_OMNI) amp *= directivity(vec, &sh_orV_rcv[3*m_rcv], mic_pattern); // Apply microphone directivity dampening
 
 				g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
 				g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
@@ -793,16 +796,19 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	gpuErrchk( cudaMalloc(&orV_rcv, M_rcv*3*sizeof(float)) );
 	gpuErrchk( cudaMemcpy(pos_src, h_pos_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
 	gpuErrchk( cudaMemcpy(pos_rcv, h_pos_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
-	gpuErrchk( cudaMemcpy(orV_src, h_orV_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice ) );
-	gpuErrchk( cudaMemcpy(orV_rcv, h_orV_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice ) );
-	
+	if (spkr_pattern != DIR_OMNI) gpuErrchk( cudaMemcpy(orV_src, h_orV_src, M_src*3*sizeof(float), cudaMemcpyHostToDevice) );
+	if (mic_pattern  != DIR_OMNI) gpuErrchk( cudaMemcpy(orV_rcv, h_orV_rcv, M_rcv*3*sizeof(float), cudaMemcpyHostToDevice) );
 	
 	// Use the ISM to calculate the amplitude and delay of each image
 	dim3 threadsPerBlockISM(nThreadsISM_x, nThreadsISM_y, nThreadsISM_z);
 	dim3 numBlocksISM(ceil((float)nb_img[0] / nThreadsISM_x), 
 					  ceil((float)nb_img[1] / nThreadsISM_y), 
 					  ceil((float)nb_img[2] / nThreadsISM_z));
-	int shMemISM = (M_src + 2*M_rcv) * 3 * sizeof(float);
+	int shMemISM = 0;
+	shMemISM += (spkr_pattern == DIR_OMNI)? M_src : 2*M_src;
+	shMemISM += (mic_pattern  == DIR_OMNI)? M_rcv : 2*M_rcv;
+	shMemISM *= 3 * sizeof(float);
+	// printf("shMemISM: %d\n", shMemISM);
 	
 	float* amp; // Amplitude with which the signals from each image source of each source arrive to each receiver
 	gpuErrchk( cudaMalloc(&amp, M_src*M_rcv*nb_img[0]*nb_img[1]*nb_img[2]*sizeof(float)) );
