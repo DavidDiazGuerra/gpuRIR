@@ -10,7 +10,7 @@ Expands the functionality of gpuRIR by multiple optional extensions, listed as f
 * Easy impulse response (IR) file generation with stereo support
 
 We have example usages of these features in our example scripts:
-`examples/mono_filters.py` and `examples/stereo_filters.py`.
+`examples/extensions/mono_filters.py` and `examples/extensions/stereo_filters.py`.
 
 ## Frequency dependent absorption coefficients
 
@@ -133,7 +133,7 @@ applying the HRIR corresponding to the azimuth and elevation of the direct path
 to the source. The `HRTF_Filter` is best used with our `BinauralReceiver`,
 which simulates human ears as two receivers placed in the room.
 
-Please see `examples/stereo_filters.py` for an example on how these two classes
+Please see `examples/extensions/stereo_filters.py` for an example on how these two classes
 are used.
 
 ### Relevant scripts
