@@ -19,7 +19,7 @@ class RoomParameters:
         att_diff,
         att_max,
         fs,
-        bit_depth,
+        bit_depth,  # TODO: THhis is only to write wav files, it migh be better not including it here
         abs_weights = 5 * [0.9] + [0.5],
         wall_materials = None,
         head_position = None, # Only for HRTF

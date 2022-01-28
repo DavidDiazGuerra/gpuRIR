@@ -15,7 +15,7 @@ class AirAbsSTFT(FilterStrategy):
     '''
 
     def __init__(self, T=25, hr=50, ps=1, fs=44100, nFFT=256, noverlap=int(256*0.75), window='hanning'):
-        ''' Instatiates STFT-driven air absorption.
+        ''' Instatiates STFT-driven air absorption.
         For further reference about parameters see scipy.signal.stft
         '''
         self.T = T
@@ -28,7 +28,7 @@ class AirAbsSTFT(FilterStrategy):
         self.NAME = "STFT_air_abs"
 
     def STFT_air_absorption(self, RIR):
-        ''' Applies air absorption to RIR using STFT.
+        ''' Applies air absorption to RIR using STFT.
 
         Parameters
 	    ----------
@@ -66,16 +66,16 @@ class AirAbsSTFT(FilterStrategy):
 
     def apply(self, IR):
         '''
-        Calls method to apply air absorption to RIR using STFT.
+        Calls method to apply air absorption to RIR using STFT.
         
         Parameters
 	    ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Room impulse response array.
 
         Returns
 	    -------
-        2D ndarray
+        2D ndarray
             Processed Room impulse response array.
         '''
         return self.STFT_air_absorption(IR)

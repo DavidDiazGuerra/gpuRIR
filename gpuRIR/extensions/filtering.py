@@ -1,31 +1,19 @@
 import numpy as np
-import numpy.matlib
 import matplotlib.pyplot as plt
-from math import ceil
 from scipy.io import wavfile
 import time
 
 from gpuRIR.extensions.filters.filter import Filter
-from gpuRIR.extensions.filters.characteristic_filter import CharacteristicFilter
-from gpuRIR.extensions.filters.air_absorption_bandpass import AirAbsBandpass
-from gpuRIR.extensions.filters.air_absorption_stft import AirAbsSTFT
-from gpuRIR.extensions.filters.linear_filter import LinearFilter
-import gpuRIR.extensions.filters.characteristic_models as cm
-import gpuRIR.extensions.filters.air_absorption_calculation as aa
-from gpuRIR.extensions.wall_absorption.materials import Materials as mat
-import gpuRIR.extensions.wall_absorption.freq_dep_abs_coeff as fdac
 from gpuRIR.extensions.create_spectrogram import create_spectrogram_from_data
-import gpuRIR.extensions.room_parameters as rp
-from gpuRIR.extensions.generate_RIR import generate_RIR
 
 
 """ Generates an impulse response WAV file (IR) with optional filters.
-Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
+Example usage: Convolving (reverberating) an audio signal in an impulse response loader plug-in like Space Designer in Logic Pro X.
 """
 
 
 def mono_adaptive_gain(source, bit_depth, ceiling):
-    ''' Increases amplitude (loudness) to defined ceiling. Operates in an adaptive manner to prevent clipping.
+    ''' Increases amplitude (loudness) to defined ceiling. Operates in an adaptive manner to prevent clipping.
 
     Parameters:
     ----------- 
@@ -33,8 +21,8 @@ def mono_adaptive_gain(source, bit_depth, ceiling):
         Sound data to process.
     bit_depth : int
         Bit depth of source sound data.
-    ceiling : int
-        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to. [dB]
+    ceiling : int
+        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to. [dB]
         This way, the loudest sample will result being the ceiling in dB (eg. -1dB)
 
     Returns
@@ -56,18 +44,18 @@ def mono_adaptive_gain(source, bit_depth, ceiling):
 
 
 def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
-    ''' Increases amplitude (loudness) to defined ceiling.
+    ''' Increases amplitude (loudness) to defined ceiling.
 
     Parameters:
     ----------- 
     source_l : 2D ndarray
         Left channel sound data to process.
-    source_r : 2D ndarray
+    source_r : 2D ndarray
         Right channel sound data to process.
-    bit_depth : int 
+    bit_depth : int 
         Bit depth of source sound data.
     ceiling : float
-        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to. [dB]
+        Maximum loudness (relative dB, e.g. -1dB) the sound data should be amplified to. [dB]
         This way, the loudest sample will result being the ceiling in dB (eg. -1dB)
 
     Returns
@@ -97,14 +85,14 @@ def stereo_adaptive_gain(source_l, source_r, bit_depth, ceiling):
 
 
 def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_wave=False, enable_adaptive_gain=False, visualize=False, verbose=False):
-    ''' Filters a mono IR file out of given source sound data and an optional array of filters to be applied.
+    ''' Filters a mono IR file out of given source sound data and an optional array of filters to be applied.
 
     Parameters:
     ----------- 
     source : 2D ndarray
         Sound data to be converted into an impulse response file.
-    filters : list
-        List of filters to be applied (in that order)
+    filters : list
+        List of filters to be applied (in that order)
     bit_depth : int
         Bit depth of source sound data.
     fs : int
@@ -136,7 +124,7 @@ def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_w
 
         # Print processing time per filter (relevant for benchmarking)
         if verbose:
-            print(f"{filters[i].NAME} time = {end_time-start_time} seconds")
+            print(f"{filters[i].NAME} time = {end_time-start_time} seconds")
         filename_appendix = f"{filename_appendix}_{filters[i].NAME}"
 
     # Stack array vertically
@@ -148,7 +136,7 @@ def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_w
             IR_array, bit_depth, 3)
 
     if write_wave:
-        # Create stereo file (dual mono)
+        # Create stereo file (dual mono)
         IR_array_concatenated = np.concatenate((IR_array, IR_array), axis=1)
 
         # Write impulse response file
@@ -169,7 +157,7 @@ def filter_mono_IR(source, filters, bit_depth, fs, filename_appendix="", write_w
 
 
 def filter_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, filename_appendix="", write_wave=False, enable_adaptive_gain=False, verbose=False, visualize=False):
-    ''' Filters a stereo IR file out of given source sound data and an optional array of filters to be applied.
+    ''' Filters a stereo IR file out of given source sound data and an optional array of filters to be applied.
 
     Parameters:
     ----------- 
@@ -177,10 +165,10 @@ def filter_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, fi
         Right channel sound data to be converted into an impulse response file.
     source_l : 2D ndarray
         Left channel sound data to be converted into an impulse response file.
-    filters_r : list
-        List of right channel filters to be applied (in that order)
-    filters_l : list
-        List of left channel filters to be applied (in that order)
+    filters_r : list
+        List of right channel filters to be applied (in that order)
+    filters_l : list
+        List of left channel filters to be applied (in that order)
     bit_depth : int
         Bit depth of source sound data.
     fs : int
@@ -216,7 +204,7 @@ def filter_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, fi
         # Print processing time per filter (relevant for benchmarking)
         if verbose:
             print(
-                f"Right Channel {filters_r[i].NAME} time = {end_time-start_time} seconds")
+                f"Right Channel {filters_r[i].NAME} time = {end_time-start_time} seconds")
         filename_appendix = f"{filename_appendix}_{filters_r[i].NAME}"
 
     for i in range(len(filters_l)):
@@ -226,7 +214,7 @@ def filter_stereo_IR(source_r, source_l, filters_r, filters_l, bit_depth, fs, fi
         # Print processing time per filter (relevant for benchmarking)
         if verbose:
             print(
-                f"Left Channel {filters_l[i].NAME} time = {end_time-start_time} seconds")
+                f"Left Channel {filters_l[i].NAME} time = {end_time-start_time} seconds")
         filename_appendix = f"{filename_appendix}_{filters_l[i].NAME}"
 
     # Stack array vertically

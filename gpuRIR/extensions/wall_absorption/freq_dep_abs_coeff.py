@@ -1,19 +1,12 @@
-import gpuRIR
-from .materials import Materials as mat
 import gpuRIR.extensions.generate_RIR as gRIR
 
 import numpy as np
-import numpy.matlib
 import matplotlib.pyplot as plt
-from math import ceil
 from scipy.interpolate import interp1d
-import time
-import multiprocessing
-from multiprocessing import Pool
 from gpuRIR.extensions.filters.butterworth import Butterworth
 
 
-def interpolate_pair(abs_coeff, visualize):
+def interpolate_pair(abs_coeff, visualize=False):
     """Interpolates frequency response array. Returns a function.
     
     Parameters
@@ -33,7 +26,7 @@ def interpolate_pair(abs_coeff, visualize):
     y = abs_coeff[:, 1]
     x = abs_coeff[:, 0]
     f = interp1d(x, y, bounds_error=False, fill_value=(y[0], y[-1]))
-    x_interpolated = np.arange(1, 20000)
+    x_interpolated = np.arange(1, 20000)    # TODO: Should 20000 be adjustable?
     y_interpolated = f(x_interpolated)
     if visualize:
         plt.title(
@@ -49,7 +42,7 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
     Parameters:
     -----------
     params : RoomParameters
-        gpuRIR parameters
+        gpuRIR parameters
     band_width : int, optional
         Initial width of frequency band. Lower means higher quality but less performant. (recommended: 10)
     factor : float, optional
@@ -67,7 +60,7 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
 
     Returns
     -------
-    2D ndarray
+    2D ndarray
         Processed Room impulse response array.
     """
 
@@ -151,9 +144,10 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
             abs_coeffs[j] = wall_mat_interp[j](band[1])
         # Generate RIR
         params.beta = 6 * [1.] - abs_coeffs
-        RIR = gRIR.generate_RIR(params)
+        RIR = gRIR.generate_RIR(params)     # TODO: Computing all the octaves in parallel in the GPU would be far more
+                                            # efficient, but this mean a lot of modifications on the CUDA code.
 
-        # Apply band/lowpassing and re-compiling sound data
+        # Apply band/lowpassing and re-compiling sound data
         for rcv in range(len(params.pos_rcv)):
             # Lowpass lowest frequency band
             if i == 0 and not use_bandpass_on_borders:
@@ -161,15 +155,15 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
                     RIR[rcv], band[2], params.fs, 'lowpass', order * 4, visualize
                 )
                 if verbose:
-                    print(f"Lowpass frequency: {band[2]}  Order: {order * 4}")
+                    print(f"Lowpass frequency: {band[2]}  Order: {order * 4}")
 
-            # Highpass highest frequency band
+            # Highpass highest frequency band
             elif i == (len(bands) - 1) and not use_bandpass_on_borders:
                 processed = Butterworth.apply_pass_filter(
                     RIR[rcv], band[0], params.fs, 'highpass', order * 4, visualize
                 )
                 if verbose:
-                    print(f"Highpass frequency: {band[0]} Order: {order * 4}")
+                    print(f"Highpass frequency: {band[0]} Order: {order * 4}")
 
             # All other bands are bandpassed
             else:
@@ -178,7 +172,7 @@ def generate_RIR_freq_dep_walls(params, band_width=100, factor=1.5, order=4, LR=
                 if verbose:
                     print(f"Band {i} Bandpass frequency: {band[0]}  Order: {order}")
 
-            # Re-compiling sound data
+            # Re-compiling sound data
             receiver_channels.resize(len(params.pos_rcv), len(processed))
             receiver_channels[rcv] += processed
 

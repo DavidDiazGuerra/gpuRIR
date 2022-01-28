@@ -10,11 +10,11 @@ def create_spectrogram_from_file(inner_file_path, title="", channel_count=1):
 
     Parameters
     ----------
-    inner_file_path : str
+    inner_file_path : str
         Path to the sound file that we want to visualize (WAV format)
-    title : str, optional
+    title : str, optional
         Title of spectrogram
-    channel_count : int, optional
+    channel_count : int, optional
         Number of channels
     """
     fs, source = wavfile.read(inner_file_path)
@@ -39,11 +39,11 @@ def create_spectrogram_from_data(source, fs, channel_name="", title=""):
     ----------
     source : ndarray
         Sound data that we want to visualize (stereo or mono)
-    fs : int
+    fs : int
         Sampling rate (Hertz) of sound data.
-    title : str, optional
+    title : str, optional
         Title of spectrogram
-    channel_count : int, optional
+    channel_count : int, optional
         Number of channels
     """
     plt.rcParams.update({'font.size': 18})

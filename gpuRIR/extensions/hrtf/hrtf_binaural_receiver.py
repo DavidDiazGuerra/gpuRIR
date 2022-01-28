@@ -21,7 +21,7 @@ class BinauralReceiver():
             Position of head in 3D space.
         head_direction : 3D ndarray
             Direction the head is pointing towards in the 3D space.
-        verbose : bool, optional
+        verbose : bool, optional
             Terminal output for debugging or further information.
         '''
         assert(head_direction[0] != 0 or head_direction[1] != 0), \
@@ -89,7 +89,7 @@ class BinauralReceiver():
             Position of head in 3D space.
         head_direction : 3D ndarray
             Direction the head is pointing towards in the 3D space.
-        verbose : bool, optional
+        verbose : bool, optional
             Terminal output for debugging or further information.
         '''
         self.position = head_position

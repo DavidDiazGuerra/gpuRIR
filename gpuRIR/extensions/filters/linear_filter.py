@@ -23,12 +23,12 @@ class LinearFilter(FilterStrategy):
 
         Parameters
 	    ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Room impulse response array.
 
         Returns
 	    -------
-        2D ndarray
+        2D ndarray
             Processed Room impulse response array.
         '''
         b_siumulated_mic = scipy.signal.firls(self.numtaps, self.bands, self.desired, fs=self.fs)  # design filter
@@ -52,12 +52,12 @@ class LinearFilter(FilterStrategy):
 
         Parameters
 	    ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Room impulse response array.
 
         Returns
 	    -------
-        2D ndarray
+        2D ndarray
             Processed Room impulse response array.
 
         '''

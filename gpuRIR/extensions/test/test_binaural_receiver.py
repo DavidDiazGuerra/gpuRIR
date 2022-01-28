@@ -1,5 +1,4 @@
 from pytest import approx
-import numpy as np
 from gpuRIR.extensions.hrtf.hrtf_binaural_receiver import BinauralReceiver
 
 

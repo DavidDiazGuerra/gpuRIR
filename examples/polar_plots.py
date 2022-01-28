@@ -15,14 +15,14 @@ import gpuRIR.extensions.generate_RIR as gRIR
 
 """ 
 Visualizes polar patterns of the source by rotating source by 360, repeatedly calling gpuRIR.
-Warning: Takes up to 2-3 minutes depending on your hardware!
+Warning: Takes up to 2-3 minutes depending on your hardware!
 """
 
 # Feel free to change these parameters
 # Resolution of polar plot (amount to divide 360 degrees into)
 PARTITIONS = 360
 
-# gpuRIR parameters
+# gpuRIR parameters
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(False)
 
@@ -35,7 +35,7 @@ MAX_VALUES = np.zeros((POLAR_PATTERNS.shape[0], PARTITIONS))
 def normalize_amps(amps):
     '''
     Normalizing amplitude. Change all amplitude such that loudest sample has the amplitude of 1.
-    :param amps Array of samples.
+    :param amps Array of samples.
     '''
     amps_normalized = np.copy(amps)
     max_value = np.max(amps_normalized)
@@ -52,7 +52,7 @@ def create_polar_plot(fig, i, amps, name):
     '''
     Creates single polar plot.
 
-    :param fig Plot figure.
+    :param fig Plot figure.
     :param i Index of plot
     :param name Name of polar pattern
     '''
@@ -71,7 +71,7 @@ def create_polar_plots(title=""):
     '''
     Creates compilation of polar plots using plotly.
 
-    :param title Title of plot.
+    :param title Title of plot.
     '''
     fig_polar = make_subplots(rows=2, cols=3, specs=[[{'type': 'polar'}]*3]*2)
     for i in range(6):
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                 att_diff=15.0,
                 att_max=60.0,  # Attenuation at the end of the simulation [dB]
                 fs=44100,  # Sampling frequency [Hz]
-                # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
+                # Bit depth of WAV file. Either np.int8 for 8 bit, np.int16 for 16 bit or np.int32 for 32 bit
                 bit_depth=np.int32,
                 beta=6*[0.1]
             )

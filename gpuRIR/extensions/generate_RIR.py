@@ -1,13 +1,14 @@
 import gpuRIR
 
 def generate_RIR(param):
+    # TODO: Integrate this with the original simulateRIR function preserving backward compatibility
     '''
-    Generates RIRs from the gpuRIR library.
+    Generates RIRs from the gpuRIR library.
 
     Parameters
     ----------
     params : RoomParameters
-        gpuRIR parameters
+        gpuRIR parameters
     
     Returns
     -------
@@ -22,5 +23,5 @@ def generate_RIR(param):
                               orV_src=param.orV_src, orV_rcv=param.orV_rcv,
                               spkr_pattern=param.spkr_pattern, mic_pattern=param.mic_pattern)
 
-    # return receiver channels (mono), number of receivers, sampling frequency and bit depth from RIRs.
+    # return receiver channels (mono), number of receivers, sampling frequency and bit depth from RIRs.
     return RIRs[0]

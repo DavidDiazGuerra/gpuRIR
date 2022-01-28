@@ -15,19 +15,19 @@ class Butterworth():
 	    ----------
         lowcut : int
             Lower bound of bandpass. [Hz]
-        highcut : int
+        highcut : int
             Upper bound of bandpass. [Hz]
         fs : int
             Sample rate. [Hz]
         order : int
             Order of Butterworth filter.
-        visualize : bool, optional
+        visualize : bool, optional
             Plots band divisions in a graph.
 
         Returns
 	    -------
         ndarray
-            Second order sections of IIR filter.
+            Second order sections of IIR filter.
         '''
         sos = butter(order, [lowcut, highcut],
                      btype='bandpass', fs=fs, output='sos')
@@ -44,7 +44,7 @@ class Butterworth():
 	    ----------
         lowcut : int
             Lower bound of bandpass. [Hz]
-        highcut : int
+        highcut : int
             Upper bound of bandpass. [Hz]
         fs : int
             Sample rate. [Hz]
@@ -52,7 +52,7 @@ class Butterworth():
             Order of Butterworth filter.
         LR : bool 
             Enables Linkwitz-Riley filter.
-        visualize : bool, optional
+        visualize : bool, optional
             Plots band divisions in a graph.
         
         Returns
@@ -74,13 +74,13 @@ class Butterworth():
 
         Parameters
 	    ----------
-        cut : int
+        cut : int
             Cut frequency [Hz]
-        fs : int
+        fs : int
             Sample rate. [Hz]
-        pass_type : str
-            Type of butterworth filter (e.g. 'lowpass' or 'highpass').
-        order : int
+        pass_type : str
+            Type of butterworth filter (e.g. 'lowpass' or 'highpass').
+        order : int
             Order of Butterworth filter.
         visualize : bool, optional
             Plots band divisions in a graph.
@@ -103,13 +103,13 @@ class Butterworth():
 
         Parameters
 	    ----------
-        cut : int
+        cut : int
             Cut frequency [Hz]
-        fs : int
+        fs : int
             Sample rate. [Hz]
-        pass_type : str
-            Type of butterworth filter (e.g. 'lowpass' or 'highpass').
-        order : int
+        pass_type : str
+            Type of butterworth filter (e.g. 'lowpass' or 'highpass').
+        order : int
             Order of Butterworth filter.
         visualize : bool, optional
             Plots band divisions in a graph.

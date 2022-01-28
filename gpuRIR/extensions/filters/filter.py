@@ -6,7 +6,7 @@ class Filter(object):
 
         Parameters
         ----------
-        filter_strategy : FilterStrategy
+        filter_strategy : FilterStrategy
             Instance of a filter.
         '''
         self._filter_strategy = filter_strategy
@@ -16,12 +16,12 @@ class Filter(object):
 
         Parameters
         ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Raw impulse response (IR) data.
 
         Returns
         -------
-        2D ndarray
+        2D ndarray
             Filtered impulse response (IR) data.
         '''
         return self._filter_strategy.apply(IR)

@@ -1,7 +1,6 @@
 from pytest import approx
 import numpy as np
 from gpuRIR.extensions.filters.hrtf_filter import HRTF_Filter
-import matplotlib.pyplot as plt
 
 ANGLE_180 = approx(np.pi)
 
@@ -101,7 +100,7 @@ def test_elevation():
     assert HRTF_Filter.calculate_elevation(
         pos_src, pos_rcv, head_direction) == ANGLE_NEG_90
 
-    # In front of head (0 degrees) (same elevation)
+    # In front of head (0 degrees) (same elevation)
     pos_src = np.array([0, 0, 0])
     pos_rcv = np.array([1, 0, 0])
     head_direction = [-1, 0, 0]

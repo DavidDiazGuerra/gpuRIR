@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import butter, lfilter, filtfilt, bilinear, sosfreqz, sosfilt
 import multiprocessing
-from multiprocessing import Pool
 
 from gpuRIR.extensions.filters.filter import FilterStrategy
 from gpuRIR.extensions.filters.air_absorption_calculation import air_absorption
@@ -19,23 +17,23 @@ class AirAbsBandpass(FilterStrategy):
 
         Parameters
             ----------
-        max_frequency : int
+        max_frequency : int
             Top end of frequency range (High pass cut).
-        min_frequency : int
+        min_frequency : int
             Bottom end of frequency range (Low pass cut).
-        divisions : int
+        divisions : int
             Amount of bands the RIR gets divided into. The higher the value the better the quality, but with performance penalties.
-        fs : int
+        fs : int
             Sample rate [Hz]
         order : int
             Order of Butterworth or Linkwitz-Riley filter.
-        LR : bool, optional
+        LR : bool, optional
             Enables Linkwitz-Riley filter.
         use_bandpass_on_borders : bool, optional
             Uses bandpass instead of high/lowpass filters on lowest and highest band.
-        verbose : bool, optional
+        verbose : bool, optional
             Terminal output for debugging or further information.
-        visualize : bool, optional
+        visualize : bool, optional
             Plots band divisions in a graph
         '''
         assert(order >= 4), "Order must be greater than 4!"
@@ -59,12 +57,12 @@ class AirAbsBandpass(FilterStrategy):
 
         Parameters
             ----------
-        sample_number : int
+        sample_number : int
             How many samples have passed.
-        sampling_frequency : int
+        sampling_frequency : int
             Sample rate [Hz]
-        c : float
-            Speed of sound. 
+        c : float
+            Speed of sound. 
 
         Returns
             -------
@@ -79,17 +77,17 @@ class AirAbsBandpass(FilterStrategy):
 
         Parameters
             ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Room impulse response array..
-        band_num : int
+        band_num : int
             number of frequency band.
-        frequency_range : float
+        frequency_range : float
             Frequency range of band [Hz]
         '''
 
         band = frequency_range / self.divisions
 
-        # Upper ceiling of each band
+        # Upper ceiling of each band
         band_max = (band * band_num)
 
         # Lower ceiling of each band and handling of edge case
@@ -105,7 +103,7 @@ class AirAbsBandpass(FilterStrategy):
             print(
                 f"Band {band_num}:\tMin:{band_min}\tMean:{band_mean}\tMax:{band_max}\tBand width:{band_max - band_mean}")
 
-        # Prepare + apply bandpass filter
+        # Prepare + apply bandpass filter
         if band_num == 1 and not self.use_bandpass_on_borders:
             filtered_signal = Butterworth.apply_pass_filter(
                 IR, band_max, self.fs, 'lowpass', self.order*4, self.visualize
@@ -137,7 +135,7 @@ class AirAbsBandpass(FilterStrategy):
 
         Parameters
             ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Room impulse response array.
 
         Returns
@@ -161,7 +159,7 @@ class AirAbsBandpass(FilterStrategy):
         if not self.visualize:
             if self.verbose:
                 print("Processed bands are out of order due to multi-processing.")
-            # Divide frequency range into defined frequency bands
+            # Divide frequency range into defined frequency bands
             filtered_signals = pool.starmap(self.apply_single_band,
                                             ((IR, j, frequency_range)
                                              for j in range(1, self.divisions + 1))
@@ -180,11 +178,11 @@ class AirAbsBandpass(FilterStrategy):
 
     def apply(self, IR):
         '''
-        Calls method to apply air absorption to RIR using bandpass filtering.
+        Calls method to apply air absorption to RIR using bandpass filtering.
 
         Parameters
             ----------
-        IR : 2D ndarray
+        IR : 2D ndarray
             Room impulse response array.
 
         Returns
