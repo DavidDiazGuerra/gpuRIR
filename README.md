@@ -14,6 +14,7 @@
   * [`beta_SabineEstimation`](#beta_sabineestimation)
   * [`att2t_SabineEstimator`](#att2t_sabineestimator)
   * [`t2n`](#t2n)
+  * [`extensions`](#t2n)
 - [References](#references)
 
 
@@ -176,6 +177,13 @@ Estimation of the number of images needed for a correct RIR simulation.
 
 *3 elements list of integers.*
         The number of images sources to compute in each dimension.
+
+### `extensions`
+
+
+[@corrooli](https://github.com/corrooli) and [@fuerbringer](https://github.com/fuerbringer) made an awesome job implementing some interesting extra features for gpuRIR in python, such as simulating air absorption or frequency dependant wall absorption coefficients. 
+
+I would like to better integrate these features with the rest of the library, but sadly I have no time to do this now. You can find more information about how to use these functions in the [documentation of the subpackage](gpuRIR/extensions), in their [pull request](https://github.com/DavidDiazGuerra/gpuRIR/pull/27), or their [examples](examples/extensions). I am including this as they developed it and I cannot offer support for it.
 
 
 ## References
