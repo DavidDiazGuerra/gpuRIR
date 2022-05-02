@@ -11,6 +11,8 @@ cuda_select_nvcc_arch_flags(CUDA_ARCH_FLAGS Common) # Change Common by Auto for 
 string(REPLACE ";" " " CUDA_ARCH_FLAGS "${CUDA_ARCH_FLAGS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_ARCH_FLAGS}")
 
+set_target_properties(gpuRIRcu PROPERTIES CUDA_ARCHITECTURES "35;50;72;86")
+
 set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -D_FORCE_INLINES")
 # set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -lineinfo")
 
