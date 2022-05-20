@@ -1,0 +1,7 @@
+typedef char __nv_bool;
+# 216 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 3
+typedef unsigned long size_t;
+#include "crt/device_runtime.h"
+# 2188 "/usr/include/c++/8/x86_64-redhat-linux/bits/c++config.h" 3
+typedef unsigned long _ZSt6size_t;
+#include "common_functions.h"

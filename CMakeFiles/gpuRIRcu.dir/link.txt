@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgpuRIRcu.a CMakeFiles/gpuRIRcu.dir/src/gpuRIR_cuda.cu.o
+/usr/bin/ranlib libgpuRIRcu.a

@@ -50,10 +50,10 @@ py::array gpuRIR_bind::simulateRIR_bind(std::vector<float> room_sz, // Size of t
 	assert(room_sz.size() == 3);
 	assert(beta.size() == 6);
 	assert(nb_img.size() == 3);
-	assert(pos_src.ndim == 2);
-	assert(pos_rcv.ndim == 2);
-	assert(orV_src.ndim == 2);
-	assert(orV_rcv.ndim == 2);
+	assert(pos_src.ndim() == 2);
+	assert(pos_rcv.ndim() == 2);
+	assert(orV_src.ndim() == 2);
+	assert(orV_rcv.ndim() == 2);
 	assert(info_pos_src.shape[1] == 3);
 	assert(info_pos_rcv.shape[1] == 3);
 	assert(info_orV_src.shape[1] == 3);
@@ -95,8 +95,8 @@ py::array gpuRIR_bind::gpu_conv(py::array_t<float, py::array::c_style> source_se
 	py::buffer_info info_RIR = RIR.request();
 	
 	// Check input sizes
-	assert(source_segments.ndim == 2);
-	assert(RIR.ndim == 3);
+	assert(source_segments.ndim() == 2);
+	assert(RIR.ndim() == 3);
 	assert(info_source_segments.shape[0] == info_RIR.shape[0]);
 	int M_src = info_source_segments.shape[0];
 	int segment_len = info_source_segments.shape[1];

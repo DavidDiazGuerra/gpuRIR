@@ -31,6 +31,9 @@ default_target: all
 
 .SUFFIXES: .hpux_make_needs_suffix_list
 
+# Produce verbose output by default.
+VERBOSE = 1
+
 # Command-line flag to silence nested $(MAKE).
 $(VERBOSE)MAKESILENT = -s
 
@@ -57,17 +60,17 @@ RM = /opt/lintula/worktmp/software/anaconda3/envs/at_env/lib/python3.9/site-pack
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/hsdadi/PycharmProjects/gpuRIR
+CMAKE_SOURCE_DIR = /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles/_CMakeLTOTest-CXX/src
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/hsdadi/PycharmProjects/gpuRIR
+CMAKE_BINARY_DIR = /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles/_CMakeLTOTest-CXX/bin
 
 #=============================================================================
 # Targets provided globally by CMake.
 
 # Special rule for the target edit_cache
 edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
+	@echo "No interactive CMake dialog available..."
 	/opt/lintula/worktmp/software/anaconda3/envs/at_env/lib/python3.9/site-packages/cmake/data/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
 .PHONY : edit_cache
 
@@ -77,7 +80,7 @@ edit_cache/fast: edit_cache
 
 # Special rule for the target rebuild_cache
 rebuild_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
+	@echo "Running CMake to regenerate build system..."
 	/opt/lintula/worktmp/software/anaconda3/envs/at_env/lib/python3.9/site-packages/cmake/data/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
@@ -87,14 +90,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(CMAKE_COMMAND) -E cmake_progress_start /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles /home/hsdadi/PycharmProjects/gpuRIR/third_party/pybind11//CMakeFiles/progress.marks
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 third_party/pybind11/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles/_CMakeLTOTest-CXX/bin//CMakeFiles/progress.marks
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/hsdadi/PycharmProjects/gpuRIR/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 third_party/pybind11/clean
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 clean
 .PHONY : clean
 
 # The main clean target
@@ -103,18 +106,92 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 third_party/pybind11/preinstall
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 third_party/pybind11/preinstall
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
+
+#=============================================================================
+# Target rules for targets named foo
+
+# Build rule for target.
+foo: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 foo
+.PHONY : foo
+
+# fast build rule for target.
+foo/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo.dir/build.make CMakeFiles/foo.dir/build
+.PHONY : foo/fast
+
+#=============================================================================
+# Target rules for targets named boo
+
+# Build rule for target.
+boo: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 boo
+.PHONY : boo
+
+# fast build rule for target.
+boo/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/boo.dir/build.make CMakeFiles/boo.dir/build
+.PHONY : boo/fast
+
+foo.o: foo.cpp.o
+.PHONY : foo.o
+
+# target to build an object file
+foo.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo.dir/build.make CMakeFiles/foo.dir/foo.cpp.o
+.PHONY : foo.cpp.o
+
+foo.i: foo.cpp.i
+.PHONY : foo.i
+
+# target to preprocess a source file
+foo.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo.dir/build.make CMakeFiles/foo.dir/foo.cpp.i
+.PHONY : foo.cpp.i
+
+foo.s: foo.cpp.s
+.PHONY : foo.s
+
+# target to generate assembly for a file
+foo.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/foo.dir/build.make CMakeFiles/foo.dir/foo.cpp.s
+.PHONY : foo.cpp.s
+
+main.o: main.cpp.o
+.PHONY : main.o
+
+# target to build an object file
+main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/boo.dir/build.make CMakeFiles/boo.dir/main.cpp.o
+.PHONY : main.cpp.o
+
+main.i: main.cpp.i
+.PHONY : main.i
+
+# target to preprocess a source file
+main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/boo.dir/build.make CMakeFiles/boo.dir/main.cpp.i
+.PHONY : main.cpp.i
+
+main.s: main.cpp.s
+.PHONY : main.s
+
+# target to generate assembly for a file
+main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/boo.dir/build.make CMakeFiles/boo.dir/main.cpp.s
+.PHONY : main.cpp.s
 
 # Help Target
 help:
@@ -124,6 +201,14 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... boo"
+	@echo "... foo"
+	@echo "... foo.o"
+	@echo "... foo.i"
+	@echo "... foo.s"
+	@echo "... main.o"
+	@echo "... main.i"
+	@echo "... main.s"
 .PHONY : help
 
 
@@ -135,6 +220,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /home/hsdadi/PycharmProjects/gpuRIR && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

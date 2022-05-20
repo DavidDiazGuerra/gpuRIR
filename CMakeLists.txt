@@ -24,6 +24,10 @@ set_target_properties(gpuRIRcu PROPERTIES
     # CUDA_SEPARABLE_COMPILATION ON
 )
 
+find_package(PythonLibs REQUIRED)
+include_directories(${PYTHON_INCLUDE_DIRS})
+target_link_libraries(gpuRIRcu ${PYTHON_LIBRARIES})
+
 add_library(gpuRIR_bind MODULE
     src/python_bind.cpp
 )
