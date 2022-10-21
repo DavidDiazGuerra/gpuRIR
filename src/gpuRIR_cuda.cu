@@ -310,7 +310,7 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
 				sh_orV_src[m*3+2] = g_orV_src[m*3+2];
 			}
 		}
-		sh_orV_rcv = &sh_orV_src[M_rcv*3];
+		sh_orV_rcv = &sh_orV_src[M_src*3];
 	}  else sh_orV_rcv = sh_orV_src;
 	if (mic_pattern != DIR_OMNI) {
 		if (threadIdx.x==0 && threadIdx.y==0)  {
