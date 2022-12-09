@@ -141,7 +141,7 @@ Estimation of the reflection coefficients needed to have the desired reverberati
 #### Returns
 
 *ndarray with 6 elements.*
-        Reflection coefficients of the walls as $[beta_{x0}, beta_{x1}, beta_{y0}, beta_{y1}, beta_{z0}, beta_{z1}]$, where $beta_{x0}$ and $beta_{x1}$ are the reflection coefficents of the walls orthogonal to the x axis at x=0 and x=room_sz[0], respectively.
+        Reflection coefficients of the walls as $[\beta_{x0}, \beta_{x1}, \beta_{y0}, \beta_{y1}, \beta_{z0}, \beta_{z1}]$, where $\beta_{x0}$ and $\beta_{x1}$ are the reflection coefficients of the walls orthogonal to the x axis at x=0 and x=room_sz[0], respectively.
 
 ### `att2t_SabineEstimator`
 
