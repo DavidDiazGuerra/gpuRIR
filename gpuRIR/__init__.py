@@ -53,6 +53,34 @@ def beta_SabineEstimation(room_sz, T60, abs_weights=[1.0]*6):
     result = minimize(t60error, 0.5, args=(T60, room_sz, abs_weights), bounds=[[0, 1]])
     return np.sqrt(1 - result.x * abs_weights).astype(np.float32)
 
+
+def t60_SabineEstimation(room_sz, beta):
+    '''  Estimation of the T60 of a room given its size and its reflection coefficients using the Sabine equation.
+    
+    Parameters
+    ----------
+    room_sz : 3 elements list or numpy array
+        Size of the room (in meters).
+    beta : ndarray with 6 elements
+        Reflection coefficients of the walls as $[beta_{x0}, beta_{x1}, beta_{y0}, beta_{y1}, beta_{z0}, beta_{z1}]$,
+        where $beta_{x0}$ is the coeffcient of the wall parallel to the x axis closest
+        to the origin of coordinates system and $beta_{x1}$ the farthest.
+    
+    Returns
+    -------
+    float
+        Estimated reverberation time of the room (seconds to reach 60dB attenuation).
+
+    '''
+
+    alpha = 1 - beta**2
+    Sa = (alpha[0]+alpha[1]) * room_sz[1]*room_sz[2] + \
+        (alpha[2]+alpha[3]) * room_sz[0]*room_sz[2] + \
+        (alpha[4]+alpha[5]) * room_sz[0]*room_sz[1]
+    V = np.prod(room_sz)
+    return 0 if Sa == 0 else 0.161 * V / Sa
+
+
 def att2t_SabineEstimator(att_dB, T60):
     ''' Estimation of the time for the RIR to reach a certain attenuation using the Sabine model.
 
@@ -158,6 +186,7 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, s
     assert mic_pattern == "omni" or orV_rcv is not None, "the mics are not omni but their orientation is undefined"
     assert spkr_pattern in spkr_pattern, "spkr_pattern must be omni, homni, card, hypcard, subcard or bidir"
     assert spkr_pattern == "omni" or orV_src is not None, "the sources are not omni but their orientation is undefined"
+    assert min(nb_img) > 0, "The number of images must be greater than 0 in every dimension"
 
 
     pos_src = pos_src.astype('float32', order='C', copy=False)
@@ -171,8 +200,18 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, s
     if orV_src is None: orV_src = np.zeros_like(pos_src)
     else: orV_src = orV_src.astype('float32', order='C', copy=False)
 
+    amp, tau = gpuRIR_bind_simulator.compute_echogram_bind(room_sz, beta,
+                                                           pos_src, pos_rcv, orV_src, orV_rcv,
+                                                           polar_patterns[spkr_pattern], polar_patterns[mic_pattern],
+                                                           nb_img, Tdiff, Tmax, fs, c)
+    dp_amp = amp[..., nb_img[0]//2, nb_img[1]//2, nb_img[2]//2]
+    dp_tau = tau[..., nb_img[0]//2, nb_img[1]//2, nb_img[2]//2]
+    assert (dp_amp == amp.max((2,3,4))).all()  # TODO: Remove after checking that this never happens
+    assert (dp_tau == tau.min((2,3,4))).all()  # TODO: Remove after checking that this never happens
 
-    return gpuRIR_bind_simulator.simulateRIR_bind(room_sz, beta, pos_src, pos_rcv, orV_src, orV_rcv, polar_patterns[spkr_pattern], polar_patterns[mic_pattern], nb_img, Tdiff, Tmax, fs, c)
+    T60 = t60_SabineEstimation(room_sz, beta)
+    rir = gpuRIR_bind_simulator.render_echogram_bind(amp, tau, dp_tau, Tdiff, Tmax, T60, fs)
+    return rir
 
 def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
     ''' Filter an audio signal by the RIRs of a motion trajectory recorded with a microphone array.
