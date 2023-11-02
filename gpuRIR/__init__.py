@@ -208,6 +208,8 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, s
     dp_tau = tau[..., nb_img[0]//2, nb_img[1]//2, nb_img[2]//2]
     assert (dp_amp == amp.max((2,3,4))).all()  # TODO: Remove after checking that this never happens
     assert (dp_tau == tau.min((2,3,4))).all()  # TODO: Remove after checking that this never happens
+    amp = amp.reshape(amp.shape[0], amp.shape[1], -1)
+    tau = tau.reshape(tau.shape[0], tau.shape[1], -1)
 
     T60 = t60_SabineEstimation(room_sz, beta)
     rir = gpuRIR_bind_simulator.render_echogram_bind(amp, tau, dp_tau, Tdiff, Tmax, T60, fs)
