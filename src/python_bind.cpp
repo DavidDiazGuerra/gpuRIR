@@ -14,7 +14,7 @@ class gpuRIR_bind {
     public:
         gpuRIR_bind(bool mPrecision=false, bool lut=true) : mixed_precision(mPrecision), lookup_table(lut), gpuRIR_cuda_simulator(mPrecision, lut) {};
 
-        py::array compute_echogram_bind(std::vector<float>, std::vector<float>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, polarPattern, polarPattern, std::vector<int> ,float, float, float, float);
+        py::tuple compute_echogram_bind(std::vector<float>, std::vector<float>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, polarPattern, polarPattern, std::vector<int> ,float, float, float, float);
         py::array render_echogram_bind(py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>, float, float, float, float);
         py::array gpu_conv(py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>);
         bool activate_mixed_precision_bind(bool);
@@ -27,7 +27,7 @@ class gpuRIR_bind {
         gpuRIR_cuda gpuRIR_cuda_simulator;
 };
 
-py::array gpuRIR_bind::compute_echogram_bind(std::vector<float> room_sz, // Size of the room [m]
+py::tuple gpuRIR_bind::compute_echogram_bind(std::vector<float> room_sz, // Size of the room [m]
                                              std::vector<float> beta, // Reflection coefficients
                                              py::array_t<float, py::array::c_style> pos_src, // positions of the sources [m]
                                              py::array_t<float, py::array::c_style> pos_rcv, // positions of the receivers [m]
@@ -64,18 +64,19 @@ py::array gpuRIR_bind::compute_echogram_bind(std::vector<float> room_sz, // Size
     int M_src = info_pos_src.shape[0];
     int M_rcv = info_pos_rcv.shape[0];
 
-    std::array<float*, 2> echogram = gpuRIR_cuda_simulator.cuda_compute_echogram(&room_sz[0], &beta[0], c,
-                                                                                  (float*) info_pos_src.ptr,
-                                                                                  (float*) info_orV_src.ptr,
-                                                                                  M_src,
-                                                                                  spkr_pattern,
-                                                                                  (float*) info_pos_rcv.ptr,
-                                                                                  (float*) info_orV_rcv.ptr,
-                                                                                  M_rcv,
-                                                                                  mic_pattern,
-                                                                                  &nb_img[0], Fs);
+    std::array<float*, 3> echogram = gpuRIR_cuda_simulator.cuda_compute_echogram(&room_sz[0], &beta[0], c,
+                                                                                 (float*) info_pos_src.ptr,
+                                                                                 (float*) info_orV_src.ptr,
+                                                                                 M_src,
+                                                                                 spkr_pattern,
+                                                                                 (float*) info_pos_rcv.ptr,
+                                                                                 (float*) info_orV_rcv.ptr,
+                                                                                 M_rcv,
+                                                                                 mic_pattern,
+                                                                                 &nb_img[0], Fs);
     float* amp = echogram[0];
     float* tau = echogram[1];
+    float* doa = echogram[2];
 
     py::capsule free_when_done_amp(amp, [](void *f) {
         float *foo = reinterpret_cast<float *>(f);
@@ -83,6 +84,11 @@ py::array gpuRIR_bind::compute_echogram_bind(std::vector<float> room_sz, // Size
     });
 
     py::capsule free_when_done_tau(tau, [](void *f) {
+        float *foo = reinterpret_cast<float *>(f);
+        delete[] foo;
+    });
+
+    py::capsule free_when_done_doa(doa, [](void *f) {
         float *foo = reinterpret_cast<float *>(f);
         delete[] foo;
     });
@@ -95,13 +101,17 @@ py::array gpuRIR_bind::compute_echogram_bind(std::vector<float> room_sz, // Size
                                    sizeof(float)};
     py::array_t<float> py_amp(shape, strides, amp, free_when_done_amp);
     py::array_t<float> py_tau(shape, strides, tau, free_when_done_tau);
-    return py::make_tuple(py_amp, py_tau);
 
-//    int nSamples = ceil(Tmax*Fs);
-//    nSamples += nSamples%2; // nSamples must be even
-//    std::vector<int> shape = {M_src, M_rcv, nSamples};
-//    std::vector<size_t> strides = {M_rcv*nSamples*sizeof(float), nSamples*sizeof(float), sizeof(float)};
-//    return py::array_t<float>(shape, strides, rir, free_when_done);
+    std::vector<int> shape_doa = {M_src, M_rcv, nb_img[0], nb_img[1], nb_img[2], 3};
+    std::vector<size_t> strides_doa = {M_rcv * nb_img[0] * nb_img[1] * nb_img[2] * 3 * sizeof(float),
+                                   nb_img[0] * nb_img[1] * nb_img[2] * 3 * sizeof(float),
+                                   nb_img[1] * nb_img[2] * 3 * sizeof(float),
+                                   nb_img[2] * 3 * sizeof(float),
+                                   3 * sizeof(float),
+                                   sizeof(float)};
+    py::array_t<float> py_doa(shape_doa, strides_doa, doa, free_when_done_doa);
+
+    return py::make_tuple(py_amp, py_tau, py_doa);
 
 }
 

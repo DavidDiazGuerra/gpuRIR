@@ -19,7 +19,7 @@ class gpuRIR_cuda {
     public:
         gpuRIR_cuda(bool, bool);
 
-        std::array<float*, 2> cuda_compute_echogram(float[3], float[6], float,
+        std::array<float*, 3> cuda_compute_echogram(float[3], float[6], float,
                                                     float*, float*, int, polarPattern,
                                                     float*, float*, int, polarPattern,
                                                     int[3], float);

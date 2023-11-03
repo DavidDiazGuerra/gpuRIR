@@ -235,6 +235,7 @@ __device__ __forceinline__ float image_sample_lut(float amp, float tau, float t,
 
 __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/, 
                                   float* g_tau /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z]*/,
+                                  float* g_doa /*[M_src]M_rcv][nb_img_x][nb_img_y][nb_img_z][3]*/,
                                   float* g_pos_src/*[M_src][3]*/, float* g_pos_rcv/*[M_rcv][3]*/, float* g_orV_src/*[M_src][3]*/, float* g_orV_rcv/*[M_rcv][3]*/,
                                   polarPattern spkr_pattern, polarPattern mic_pattern, float room_sz_x, float room_sz_y, float room_sz_z,
                                   float beta_x1, float beta_x2, float beta_y1, float beta_y2, float beta_z1, float beta_z2,
@@ -334,26 +335,29 @@ __global__ void calcAmpTau_kernel(float* g_amp /*[M_src]M_rcv][nb_img_x][nb_img_
         // Individual factors for each src and rcv
         for (int m_src=0; m_src<M_src; m_src++) {
             for (int m_rcv=0; m_rcv<M_rcv; m_rcv++) {
-                float vec[3]; // Vector going from rcv to img src
+                float doa[3]; // Vector going from rcv to img src
                 float im_src_to_rcv[3]; // For speaker directivity: Vector going from img src to rcv
                 float orV_src[3]; // Temporary orV_src to prevent overwriting sh_orV_src
                 float dist = 0;
                 for (int d=0; d<3; d++) {
                     // Computing the vector going from the rcv to img src
-                    vec[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d];
-                    dist += vec[d] * vec[d];
+                    doa[d] = clust_pos[d] + (1-2*rflx_idx[d]) * sh_pos_src[m_src*3+d] - sh_pos_rcv[m_rcv*3+d];
+                    dist += doa[d] * doa[d];
 
                     // For speaker directivity
                     if (spkr_pattern != DIR_OMNI) orV_src[d] = (1-2*rflx_idx[d]) * sh_orV_src[m_src*3+d]; // If rflx_id=1 =>-1 *orV_src. If rflx_id= 0 => 1 * orV_src
-                    im_src_to_rcv[d] = -vec[d]; //change vector direction (mirror through origin)
+                    im_src_to_rcv[d] = -doa[d]; //change vector direction (mirror through origin)
                 }
                 dist = sqrtf(dist);
                 float amp = rflx_att / (4*PI*dist);
                 if (spkr_pattern != DIR_OMNI) amp *= directivity(im_src_to_rcv, orV_src, spkr_pattern); // Apply speaker directivity dampening
-                if (mic_pattern  != DIR_OMNI) amp *= directivity(vec, &sh_orV_rcv[3*m_rcv], mic_pattern); // Apply microphone directivity dampening
+                if (mic_pattern  != DIR_OMNI) amp *= directivity(doa, &sh_orV_rcv[3*m_rcv], mic_pattern); // Apply microphone directivity dampening
 
                 g_amp[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = amp;
                 g_tau[m_src*M_rcv*prodN + m_rcv*prodN + n_idx] = dist / c * Fs;
+                for (int d=0; d<3; d++) {
+                    g_doa[m_src*M_rcv*prodN*3 + m_rcv*prodN*3 + n_idx*3 + d] = doa[d] / dist;
+                }
             }
         }
     }
@@ -744,7 +748,7 @@ int gpuRIR_cuda::PadData(float *signal, float **padded_signal, int segment_len,
 /* Principal functions */
 /***********************/
 
-std::array<float*, 2> gpuRIR_cuda::cuda_compute_echogram(float room_sz[3], float beta[6], float c,
+std::array<float*, 3> gpuRIR_cuda::cuda_compute_echogram(float room_sz[3], float beta[6], float c,
                                                          float* h_pos_src, float* h_orV_src, int M_src, polarPattern spkr_pattern,
                                                          float* h_pos_rcv, float* h_orV_rcv, int M_rcv, polarPattern mic_pattern,
                                                          int nb_img[3], float Fs) {
@@ -789,13 +793,14 @@ std::array<float*, 2> gpuRIR_cuda::cuda_compute_echogram(float room_sz[3], float
     shMemISM *= 3 * sizeof(float);
     // printf("shMemISM: %d\n", shMemISM);
 
-    float *amp, *tau; // Amplitude and delay with which the signals from each image source of each source arrive to each receiver
+    float *amp, *tau, *doa; // Amplitude, delay, and doa with which the signals from each image source of each source arrive to each receiver
     int amp_tau_size = M_src * M_rcv * nb_img[0] * nb_img[1] * nb_img[2] * sizeof(float);
     gpuErrchk( cudaMalloc(&amp, amp_tau_size) );
     gpuErrchk( cudaMalloc(&tau, amp_tau_size) );
+    gpuErrchk( cudaMalloc(&doa, 3*amp_tau_size) );
 
     calcAmpTau_kernel<<<numBlocksISM, threadsPerBlockISM, shMemISM>>> (
-        amp, tau,
+        amp, tau, doa,
         pos_src, pos_rcv, orV_src, orV_rcv, spkr_pattern, mic_pattern,
         room_sz[0], room_sz[1], room_sz[2],
         beta[0], beta[1], beta[2], beta[3], beta[4], beta[5],
@@ -810,6 +815,8 @@ std::array<float*, 2> gpuRIR_cuda::cuda_compute_echogram(float room_sz[3], float
     gpuErrchk( cudaMemcpy(h_amp, amp, amp_tau_size, cudaMemcpyDeviceToHost ) );
     float* h_tau = (float*) malloc(amp_tau_size);
     gpuErrchk( cudaMemcpy(h_tau, tau, amp_tau_size, cudaMemcpyDeviceToHost ) );
+    float* h_doa = (float*) malloc(3*amp_tau_size);
+    gpuErrchk( cudaMemcpy(h_doa, doa, 3*amp_tau_size, cudaMemcpyDeviceToHost ) );
 
     // Free GPU memory
     gpuErrchk( cudaFree(pos_src) );
@@ -818,10 +825,12 @@ std::array<float*, 2> gpuRIR_cuda::cuda_compute_echogram(float room_sz[3], float
     gpuErrchk( cudaFree(orV_rcv) );
     gpuErrchk( cudaFree(amp)	 );
     gpuErrchk( cudaFree(tau)	 );
+    gpuErrchk( cudaFree(doa)	 );
 
-    std::array<float*, 2> h_echogram;
+    std::array<float*, 3> h_echogram;
     h_echogram[0] = h_amp;
     h_echogram[1] = h_tau;
+    h_echogram[2] = h_doa;
     return h_echogram;
 }
 
