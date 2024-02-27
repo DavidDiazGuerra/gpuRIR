@@ -917,6 +917,7 @@ float* gpuRIR_cuda::cuda_simulateRIR(float room_sz[3], float beta[6], float* h_p
 	// Free memory
 	gpuErrchk( cudaFree(pos_src) );
 	gpuErrchk( cudaFree(pos_rcv) );
+	gpuErrchk( cudaFree(orV_src) );
 	gpuErrchk( cudaFree(orV_rcv) );
 	gpuErrchk( cudaFree(amp)	 );
 	gpuErrchk( cudaFree(tau)	 );
