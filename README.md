@@ -31,7 +31,7 @@
 
 
 ## Installation
-You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR/zipball/master`. You can also clone or download our repository and run `python setup.py install`.
+You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR/zipball/master`. You can also clone or download our repository and run `pip install gpuRIR/`.
 
 
 ## License
