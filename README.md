@@ -23,7 +23,7 @@
 
 * **Compilers**: To install the package you will need the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (it has been tested with the release 8.0 and 10.0 but it should work fine with any version that includes cuRAND) and a C++11 compiler, such as [GCC](https://gcc.gnu.org/) or [MSVC++](https://visualstudio.microsoft.com).
 
-* **CMake**: Finally, you will need, at least, the version 3.12 of [CMake](https://cmake.org/).  You can easily get it by `pip install cmake`.
+* **CMake**: Finally, you will need, at least, the version 3.23 of [CMake](https://cmake.org/).  You can easily get it by `pip install cmake`.
 
 * **Python**: It has been tested in Python 3, but should work fine with Python 2.
 
