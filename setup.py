@@ -59,6 +59,7 @@ class CMakeBuild(build_ext):
 
 
 setup(
+    name='gpuRIR',
     ext_modules=[CMakeExtension('gpuRIR_bind')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
