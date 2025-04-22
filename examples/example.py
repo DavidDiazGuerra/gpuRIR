@@ -11,6 +11,7 @@ from math import ceil
 import gpuRIR
 gpuRIR.activateMixedPrecision(False)
 gpuRIR.activateLUT(True)
+gpuRIR.activateExperimentalMode(True)
 
 room_sz = [3,3,2.5]  # Size of the room [m]
 nb_src = 2  # Number of sources
@@ -29,7 +30,8 @@ beta = gpuRIR.beta_SabineEstimation(room_sz, T60, abs_weights=abs_weights) # Ref
 Tdiff= gpuRIR.att2t_SabineEstimator(att_diff, T60) # Time to start the diffuse reverberation model [s]
 Tmax = gpuRIR.att2t_SabineEstimator(att_max, T60)	 # Time to stop the simulation [s]
 nb_img = gpuRIR.t2n( Tdiff, room_sz )	# Number of image sources in each dimension
-RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern)
+for i in range(100):
+    RIRs = gpuRIR.simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=Tdiff, orV_rcv=orV_rcv, mic_pattern=mic_pattern)
 
 t = np.arange(int(ceil(Tmax * fs))) / fs
 plt.plot(t, RIRs.reshape(nb_src*nb_rcv, -1).transpose())

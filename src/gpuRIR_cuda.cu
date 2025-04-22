@@ -23,9 +23,11 @@ static const int nThreadsISM_z = 4;
 
 // RIR computation
 static const int initialReductionMin = 512;
-static const int lut_oversamp = 16; 
+static const int lut_oversamp = 16;
+static const int nFracDelays = 101;
 static const int nThreadsGen_t = 32;
 static const int nThreadsGen_m = 4;
+static const int nThreadsGen_m_exp = 1;
 static const int nThreadsGen_n = 1; // Don't change it
 static const int nThreadsRed = 128;
 
@@ -43,6 +45,8 @@ static const int nThreadsDiff_rcv = 2;
 static const int nThreadsConv_x = 256;
 static const int nThreadsConv_y = 1;
 static const int nThreadsConv_z = 1;
+static const int nThreadsLutConv_x = 256;
+static const int nThreadsLutConv_y = 1;
 
 #if __CUDA_ARCH__ >= 530
 #define h2zeros __float2half2_rn(0.0)
@@ -120,6 +124,11 @@ __device__ __forceinline__ float image_sample(float amp, float tau, float t, flo
     return (abs(t_tau)<Tw/2)? hanning_window(t_tau, Tw) * amp * sinc( (t_tau) * PI ) : 0.0f;
 }
 
+__device__ __forceinline__ float delta_sample(float amp, float tau, float t, float Tw) {
+    float t_tau = t - tau;
+    return (t_tau==0.0)? amp : 0.0f;
+}
+
 __device__ __forceinline__ float directivity(float doaVec[3], float orVec[3], polarPattern pattern) {
     if (pattern == DIR_OMNI) return 1.0f;
 
@@ -150,6 +159,14 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
     cufftComplex c;
     c.x = a.x * b.x - a.y * b.y;
     c.y = a.x * b.y + a.y * b.x;
+    return c;
+}
+
+// cufftComplex sum
+__device__ __forceinline__ cufftComplex ComplexSum(cufftComplex a, cufftComplex b) {
+    cufftComplex c;
+    c.x = a.x + b.x;
+    c.y = a.y + b.y;
     return c;
 }
 
@@ -378,6 +395,22 @@ __global__ void generateRIR_kernel(float* initialRIR, float* amp, float* tau, in
     }
 }
 
+__global__ void generateRIR_kernel_exp(float* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red) {
+    int m = blockIdx.x * blockDim.x + threadIdx.x;
+    int n_ini = blockIdx.y * ini_red;  // threadIdx.y is always 0 since blockDim.y is 1
+    int n_max = fminf(n_ini + ini_red, N);
+
+    if (m<M) {
+        for (int n=n_ini; n<n_max; n++) {
+            int t0 = floorf(tau[m*N+n]);
+            int frac_del_idx = roundf((tau[m*N+n] - t0) * (nFracDelays - 1));
+            if (t0 < T) {
+                initialRIR[m*nFracDelays*T*iniRIR_N + frac_del_idx*T*iniRIR_N + t0*iniRIR_N + blockIdx.y] += amp[m*N+n];
+            }
+        }
+    }
+}
+
 __global__ void reduceRIR_kernel(float* initialRIR, float* intermediateRIR, int M, int T, int N, int intRIR_N) {
     extern __shared__ float sdata[];
 
@@ -445,7 +478,7 @@ __global__ void diffRev_kernel(float* rir, float* A, float* alpha, float* tau_dp
     }
 }
 
-__global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufftComplex *RIRs, int segment_size, int M_rcv, int M_src, float scale) {
+__global__ void trajectoryConvolutionFreq(cufftComplex *signal_segments, cufftComplex *RIRs, int segment_size, int M_rcv, int M_src, float scale) {
     int numThreads_x = blockDim.x * gridDim.x;
     int numThreads_y = blockDim.y * gridDim.y;
     int numThreads_z = blockDim.z * gridDim.z;
@@ -464,6 +497,36 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
             }
         }
     }
+}
+
+__global__ void lutConvolutionFreq(cufftComplex *LUT, cufftComplex *RIRs_frac, cufftComplex *RIRs_out, int N_fft, int nFracDelays, int M) {
+//     extern __shared__ float sdata[];
+//
+//     int numThreads_x = blockDim.x * gridDim.x;
+//     int numThreads_y = blockDim.y * gridDim.y;
+//
+//     int threadID_x = blockIdx.x * blockDim.x + threadIdx.x;
+//     int threadID_y = blockIdx.y * blockDim.y + threadIdx.y;
+//
+//     int Nf = N_fft/2 + 1;
+//
+//     // Copy the lut to shared memory
+//     cufftComplex* sh_lut = (cufftComplex*) sdata;
+//     if (threadIdx.y==0 && threadIdx.z==0)  {
+//         for (int frac=threadIdx.x; frac<nFracDelays; frac+=blockDim.x) {
+//             sh_lut[frac] = LUT[frac*Nf + threadID_y];
+//         }
+//     }
+//
+//     for (int f = threadID_y; f < Nf; f += numThreads_y) {
+//         for (int m = threadID_x; m < M; m += numThreads_x) {
+//             cufftComplex sum = ComplexMul(RIRs_frac[m*nFracDelays*Nf + f], sh_lut[0]);
+//             for (int frac = 1; frac < nFracDelays; frac++) {
+//                 sum = ComplexSum(sum, ComplexMul(RIRs_frac[m*nFracDelays*Nf + frac*Nf + f], sh_lut[frac]));
+//             }
+//             RIRs_out[m*Nf + f] = ComplexScale(sum, 1.0f/N_fft);
+//         }
+//     }
 }
 
 /***************************/
@@ -560,24 +623,40 @@ __global__ void generateRIR_kernel_lut(float* initialRIR, float* amp, float* tau
 /* Auxiliar host functions */
 /***************************/
 
-cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int lut_len) {
-    // Create lut in host memory
+void create_host_sinc_lut(float* h_sinc_lut, int Tw, int lut_len) {
     int lut_center = lut_len / 2;
-    float* sinc_lut_host = (float*)malloc(sizeof(float) * lut_len);
     for (int i=0; i<=lut_center; i++) {
         float x = (float)i / lut_oversamp;
         float sinc = (x==0.0f)? 1.0f : sin(PI*x) / (PI*x);
         float hann = 0.5f * (1.0f + cos(2.0f*PI*x/Tw));
         float y = hann * sinc;
-        sinc_lut_host[lut_center+i] = y;
-        sinc_lut_host[lut_center-i] = y;
+        h_sinc_lut[lut_center+i] = y;
+        h_sinc_lut[lut_center-i] = y;
     }
+}
+
+void create_transposed_host_sinc_lut(float* h_sinc_lut, int Tw) {
+    for (int i=0; i<=Tw; i++) {
+        for (int j=0; j<nFracDelays; j++) {
+            float x = (float)(i - Tw/2) + (float)j / nFracDelays;  // Tw should always be odd
+            float sinc = (x==0.0f)? 1.0f : sin(PI*x) / (PI*x);
+            float hann = 0.5f * (1.0f + cos(2.0f*PI*x/Tw));
+            h_sinc_lut[j*Tw + i] = hann * sinc;
+        }
+    }
+}
+
+cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int lut_len) {
+    // Create lut in host memory
+    float* h_sinc_lut = (float*)malloc(sizeof(float) * lut_len);
+    create_host_sinc_lut(h_sinc_lut, Tw, lut_len);
 
     // Copy the lut to a device cudaArray
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaMallocArray(cuArrayLut, &channelDesc, lut_len);
-    cudaMemcpyToArray(*cuArrayLut, 0, 0, sinc_lut_host, sizeof(float)*lut_len,
+    cudaMemcpyToArray(*cuArrayLut, 0, 0, h_sinc_lut, sizeof(float)*lut_len,
                       cudaMemcpyHostToDevice);
+    free(h_sinc_lut);
 
     // Specify texture
     struct cudaResourceDesc resDesc;
@@ -603,34 +682,46 @@ cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int 
 void gpuRIR_cuda::cuda_rirGenerator(float* rir, float* amp, float* tau, int M, int N, int T, float Fs) {
     int initialReduction = initialReductionMin;
     while (M * T * ceil((float)N/initialReduction) > 1e9) initialReduction *= 2;
-
     int iniRIR_N = ceil((float)N/initialReduction);
-    dim3 threadsPerBlockIni(nThreadsGen_t, nThreadsGen_m, nThreadsGen_n);
-    dim3 numBlocksIni(ceil((float)T/threadsPerBlockIni.x), ceil((float)M/threadsPerBlockIni.y), iniRIR_N);
 
-    float* initialRIR;
-    gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(float)) );
 
     int Tw = (int) round(8e-3f * Fs); // Window duration [samples]
 
-    if (lookup_table) {
-        int lut_len = Tw * lut_oversamp;
-        lut_len += ((lut_len%2)? 0 : 1); // Must be odd
-        cudaArray* cuArrayLut;
-        cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
+    float* initialRIR;
+    if (experimental_mode) {
+        gpuErrchk( cudaMalloc(&initialRIR, M*nFracDelays*T*iniRIR_N*sizeof(float)) );
 
-        generateRIR_kernel_lut<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
+        dim3 threadsPerBlockIni(nThreadsGen_m_exp, nThreadsGen_n);
+        dim3 numBlocksIni(ceil((float)M/threadsPerBlockIni.y), iniRIR_N);
+        generateRIR_kernel_exp<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction );
         gpuErrchk( cudaDeviceSynchronize() );
         gpuErrchk( cudaPeekAtLastError() );
-
-        cudaDestroyTextureObject(sinc_lut);
-        cudaFreeArray(cuArrayLut);
     } else {
-        generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
-        gpuErrchk( cudaDeviceSynchronize() );
-        gpuErrchk( cudaPeekAtLastError() );
+        gpuErrchk( cudaMalloc(&initialRIR, M*T*iniRIR_N*sizeof(float)) );
+
+        dim3 threadsPerBlockIni(nThreadsGen_t, nThreadsGen_m, nThreadsGen_n);
+        dim3 numBlocksIni(ceil((float)T/threadsPerBlockIni.x), ceil((float)M/threadsPerBlockIni.y), iniRIR_N);
+
+        if (lookup_table) {
+            int lut_len = Tw * lut_oversamp;
+            lut_len += ((lut_len%2)? 0 : 1); // Must be odd
+            cudaArray* cuArrayLut;
+            cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
+
+            generateRIR_kernel_lut<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
+            gpuErrchk( cudaDeviceSynchronize() );
+            gpuErrchk( cudaPeekAtLastError() );
+
+            cudaDestroyTextureObject(sinc_lut);
+            cudaFreeArray(cuArrayLut);
+        } else {
+            generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
+            gpuErrchk( cudaDeviceSynchronize() );
+            gpuErrchk( cudaPeekAtLastError() );
+        }
     }
 
+    if (experimental_mode) M *= nFracDelays;
 
     dim3 threadsPerBlockRed(nThreadsRed, 1, 1);
     float* intermediateRIR;
@@ -650,12 +741,60 @@ void gpuRIR_cuda::cuda_rirGenerator(float* rir, float* amp, float* tau, int M, i
         iniRIR_N = intRIR_N;
     }
 
+    float *reducedRIR;
+    if (experimental_mode) {
+        gpuErrchk( cudaMalloc(&reducedRIR, M * T * sizeof(float)) );
+    } else reducedRIR = rir;  // Output
+
     dim3 numBlocksEnd(1, T, M);
     reduceRIR_kernel<<<numBlocksEnd, threadsPerBlockRed, nThreadsRed*sizeof(float)>>>(
-        initialRIR, rir, M, T, iniRIR_N, 1);
+        initialRIR, reducedRIR, M, T, iniRIR_N, 1);
     gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaPeekAtLastError() );
     gpuErrchk( cudaFree(initialRIR) );
+
+    if (experimental_mode) {
+        M /= nFracDelays;
+        int N_fft = T; // TODO: Make it a power of 2 or at least power of {2,3,5,7} ?
+
+        // Create lut in host memory
+        Tw += (Tw%2)? 0 : 1;  // It must be an odd number of samples
+        int lut_len = Tw * nFracDelays;
+        float* h_sinc_lut = (float*)malloc(sizeof(float) * lut_len);
+        create_transposed_host_sinc_lut(h_sinc_lut, Tw);
+        float* sinc_lut;
+        gpuErrchk( cudaMalloc(&sinc_lut, lut_len*sizeof(float)) );
+        gpuErrchk( cudaMemcpy(sinc_lut, h_sinc_lut, lut_len*sizeof(float), cudaMemcpyHostToDevice ) );
+
+        // CUFFT plans
+        cufftHandle plan_lut, plan_RIR, plan_RIR_inv;
+        gpuErrchk( cufftPlanMany(&plan_lut, 1, &N_fft, &Tw, 1, Tw, &N_fft, 1, N_fft, CUFFT_R2C, nFracDelays) );
+        gpuErrchk( cufftPlan1d(&plan_RIR, N_fft, CUFFT_R2C, M * nFracDelays) );
+        gpuErrchk( cufftPlan1d(&plan_RIR_inv, N_fft, CUFFT_C2R, M) );
+
+        // Transform LUT and RIR
+        float* sinc_lut_f;
+        gpuErrchk( cudaMalloc(&sinc_lut_f, nFracDelays*N_fft*sizeof(float)) );
+        gpuErrchk( cufftExecR2C(plan_lut, (cufftReal *)sinc_lut, (cufftComplex *)sinc_lut_f) );
+        gpuErrchk( cufftExecR2C(plan_RIR, (cufftReal *)reducedRIR, (cufftComplex *)reducedRIR) );
+        gpuErrchk( cudaDeviceSynchronize() );
+        gpuErrchk( cudaPeekAtLastError() );
+
+        // Multiply the coefficients together and normalize the result
+        dim3 threadsPerBlock(nThreadsLutConv_x, nThreadsLutConv_y);
+        int numBlocks_x = (int) ceil((float)M / nThreadsConv_x);
+        int numBlocks_y = (int) ceil((float)(N_fft/2+1) / nThreadsConv_y);
+        dim3 numBlocks(numBlocks_x, numBlocks_y);
+        lutConvolutionFreq<<<numBlocks, threadsPerBlock, nFracDelays*sizeof(cufftComplex)>>>
+                ((cufftComplex *)sinc_lut_f, (cufftComplex *)reducedRIR, (cufftComplex *)rir, N_fft, nFracDelays, M);
+        gpuErrchk( cudaDeviceSynchronize() );
+        gpuErrchk( cudaPeekAtLastError() );
+
+        // Transform signal back
+        gpuErrchk( cufftExecC2R(plan_RIR_inv, (cufftComplex *)rir, (cufftReal *)rir) );
+        gpuErrchk( cudaDeviceSynchronize() );
+        gpuErrchk( cudaPeekAtLastError() );
+    }
 }
 
 void cuda_rirGenerator_mp(float* rir, float* amp, float* tau, int M, int N, int T, float Fs) {
@@ -1008,6 +1147,8 @@ float* gpuRIR_cuda::cuda_convolutions(float* source_segments, int M_src, int seg
     // Transform signal and RIR
     gpuErrchk( cufftExecR2C(plan_signal, (cufftReal *)d_signal, (cufftComplex *)d_signal) );
     gpuErrchk( cufftExecR2C(plan_RIR,    (cufftReal *)d_RIR,    (cufftComplex *)d_RIR   ) );
+    gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaPeekAtLastError() );
 
     // Multiply the coefficients together and normalize the result
     dim3 threadsPerBlock(nThreadsConv_x, nThreadsConv_y, nThreadsConv_z);
@@ -1015,13 +1156,15 @@ float* gpuRIR_cuda::cuda_convolutions(float* source_segments, int M_src, int seg
     int numBlocks_y = (int) ceil((float)M_rcv/nThreadsConv_y);
     int numBlocks_z = (int) ceil((float)M_src/nThreadsConv_z);
     dim3 numBlocks(numBlocks_x, numBlocks_y, numBlocks_z);
-    complexPointwiseMulAndScale<<<numBlocks, threadsPerBlock>>>
+    trajectoryConvolutionFreq<<<numBlocks, threadsPerBlock>>>
             (d_signal, d_RIR, (N_fft/2+1), M_rcv, M_src, 1.0f/N_fft);
     gpuErrchk( cudaDeviceSynchronize() );
     gpuErrchk( cudaPeekAtLastError() );
 
     // Transform signal back
     gpuErrchk( cufftExecC2R(plan_RIR_inv, (cufftComplex *)d_RIR, (cufftReal *)d_RIR) );
+    gpuErrchk( cudaDeviceSynchronize() );
+    gpuErrchk( cudaPeekAtLastError() );
 
     // Copy device memory to host
     int conv_len = segment_len + RIR_len - 1;
@@ -1097,4 +1240,14 @@ bool gpuRIR_cuda::activate_lut(bool activate) {
     }
     lookup_table = activate;
     return lookup_table;
+}
+
+bool gpuRIR_cuda::activate_experimental_mode(bool activate) {
+    if (activate) {
+        printf("Activating the experimental mode, lookup tables and mixed precision arithmetics will be disabled.\n");
+        mixed_precision = false;
+        lookup_table = false;
+    }
+    experimental_mode = activate;
+    return experimental_mode;
 }

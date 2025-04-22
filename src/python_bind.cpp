@@ -19,6 +19,7 @@ class gpuRIR_bind {
         py::array gpu_conv(py::array_t<float, py::array::c_style>, py::array_t<float, py::array::c_style>);
         bool activate_mixed_precision_bind(bool);
         bool activate_lut_bind(bool);
+        bool activate_experimental_mode_bind(bool);
 
         bool mixed_precision;
         bool lookup_table;
@@ -200,6 +201,10 @@ bool gpuRIR_bind::activate_lut_bind(bool activate) {
     return gpuRIR_cuda_simulator.activate_lut(activate);
 }
 
+bool gpuRIR_bind::activate_experimental_mode_bind(bool activate) {
+    return gpuRIR_cuda_simulator.activate_experimental_mode(activate);
+}
+
 
 PYBIND11_MODULE(gpuRIR_bind,m)
 {
@@ -215,5 +220,6 @@ PYBIND11_MODULE(gpuRIR_bind,m)
         .def("gpu_conv", &gpuRIR_bind::gpu_conv, "Batched convolution using FFTs in GPU", py::arg("source_segments"), py::arg("RIR"))
         .def("activate_mixed_precision_bind", &gpuRIR_bind::activate_mixed_precision_bind, "Activate the mixed precision mode, only for Pascal GPU architecture or superior",
              py::arg("activate"))
-        .def("activate_lut_bind", &gpuRIR_bind::activate_lut_bind, "Activate the lookup table", py::arg("activate"));
+        .def("activate_lut_bind", &gpuRIR_bind::activate_lut_bind, "Activate the lookup table", py::arg("activate"))
+        .def("activate_experimental_mode_bind", &gpuRIR_bind::activate_experimental_mode_bind, "Activate the experimental mode", py::arg("activate"));
 }

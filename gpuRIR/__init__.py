@@ -4,11 +4,10 @@ from __future__ import division
 
 import numpy as np
 from scipy.optimize import minimize
-from scipy.signal import convolve
 
 from gpuRIR_bind import gpuRIR_bind
 
-__all__ = ["polar_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision", "activate_lut"]
+__all__ = ["polar_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activateMixedPrecision", "activateLUT", "activateExperimentalMode"]
 
 polar_patterns =	{
   "omni": 0,
@@ -212,9 +211,27 @@ def simulateRIR(room_sz, beta, pos_src, pos_rcv, nb_img, Tmax, fs, Tdiff=None, s
     tau = tau.reshape(tau.shape[0], tau.shape[1], -1)
     doa = doa.reshape(doa.shape[0], doa.shape[1], -1, 3)
 
+    # Remove extra images
+    # sort_idxs = tau.argsort(axis=-1)
+    # tau = np.take_along_axis(tau, sort_idxs, axis=-1)
+    # idx_max = max([np.searchsorted(tau_m, Tdiff * fs, side='right') for tau_m in tau.reshape(-1, tau.shape[-1])])
+    # tau = tau[..., :idx_max]
+    # amp = np.take_along_axis(amp, sort_idxs, axis=-1)[..., :idx_max]
+    # doa = np.take_along_axis(doa, sort_idxs[..., np.newaxis], axis=-2)[..., :idx_max, :]
+
+    # amp, tau, doa = remove_extra_images(amp, tau, doa, Tdiff, fs)
+
     T60 = t60_SabineEstimation(room_sz, beta)
     rir = gpuRIR_bind_simulator.render_echogram_bind(amp, tau, dp_tau, Tdiff, Tmax, T60, fs)
     return rir
+
+def remove_extra_images(amp, tau, doa, Tdiff, fs):
+    valid_idx = np.any(tau <= Tdiff * fs, axis=(0, 1))
+    amp = amp[..., valid_idx]
+    tau = tau[..., valid_idx]
+    doa = doa[..., valid_idx, :]
+    return amp, tau, doa
+
 
 def simulateTrajectory(source_signal, RIRs, timestamps=None, fs=None):
     ''' Filter an audio signal by the RIRs of a motion trajectory recorded with a microphone array.
@@ -283,6 +300,17 @@ def activateLUT(activate=True):
 
     '''
     gpuRIR_bind_simulator.activate_lut_bind(activate)
+
+def activateExperimentalMode(activate=True):
+    ''' Activate the experimental mode.
+
+    Parameters
+    ----------
+    activate : bool, optional
+        True for activate and Flase for deactivate. True by default.
+
+    '''
+    gpuRIR_bind_simulator.activate_experimental_mode_bind(activate)
 
 # Create the simulator object when the module is loaded
 gpuRIR_bind_simulator = gpuRIR_bind()

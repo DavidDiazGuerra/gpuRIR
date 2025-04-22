@@ -27,6 +27,7 @@ class gpuRIR_cuda {
         float* cuda_convolutions(float*, int, int, float*, int, int);
         bool activate_mixed_precision(bool);
         bool activate_lut(bool);
+        bool activate_experimental_mode(bool);
 
     private:
         // cuRAND generator
@@ -37,6 +38,9 @@ class gpuRIR_cuda {
 
         // Lookup table flag
         bool lookup_table;
+
+        // Experimental mode flag
+        bool experimental_mode;
 
         // Auxiliar host functions
         void cuda_rirGenerator(float*, float*, float*, int, int, int, float);
