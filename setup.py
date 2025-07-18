@@ -1,14 +1,10 @@
-# Install the python library.
-#
-# Script based on the cmake_example of pybind11 by Dean Moldovan ( https://github.com/pybind/cmake_example )
-
+"""Script is based on the cmake_example of pybind11 by Dean Moldovan: https://github.com/pybind/cmake_example"""
 import os
 import re
 import sys
 import platform
 import subprocess
 
-import setuptools
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
@@ -16,7 +12,7 @@ from distutils.version import LooseVersion
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
-        Extension.__init__(self, name, sources=[])
+        super().__init__(name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -30,8 +26,8 @@ class CMakeBuild(build_ext):
 
         if platform.system() == "Windows":
             cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)', out.decode()).group(1))
-            if cmake_version < '3.1.0':
-                raise RuntimeError("CMake >= 3.1.0 is required on Windows")
+            if cmake_version < '3.23.0':
+                raise RuntimeError("CMake >= 3.23.0 is required on Windows")
 
         for ext in self.extensions:
             self.build_extension(ext)
@@ -61,28 +57,10 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
 
 setup(
     name='gpuRIR',
-    version='1.2.0',
-    author='David Diaz-Guerra',
-    author_email='ddga@unizar.es',
-    url='',
-    description='Room Impulse Response (RIR) simulation through Image Source Method (ISM) with GPU aceleration',
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     ext_modules=[CMakeExtension('gpuRIR_bind')],
-    packages=setuptools.find_packages(),
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
-    classifiers=[
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: C++",
-        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-        "Operating System :: OS Independent",
-    ],
 )

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "wheel", "cmake>=3.23"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpuRIR"
+version = "1.2.0"
+description = "Room Impulse Response (RIR) simulation through Image Source Method (ISM) with GPU acceleration"
+authors = [
+    {name = "David Diaz-Guerra", email = "ddga@unizar.es"}
+]
+readme = "README.md"
+keywords = ["RIR", "GPU", "Image Source Method", "simulation"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 2",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools]
+packages = ["gpuRIR"]
+
+[project.optional-dependencies]
+dev = ["pytest"]

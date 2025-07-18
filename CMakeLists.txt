@@ -1,15 +1,15 @@
 # https://stackoverflow.com/questions/51907755/building-a-pybind11-module-with-cpp-and-cuda-sources-using-cmake
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.23)
 
 project(gpuRIR LANGUAGES CXX CUDA)
 find_package(CUDA)
 
 # Select several CUDA architectures
-include(FindCUDA)
-cuda_select_nvcc_arch_flags(CUDA_ARCH_FLAGS Common) # Change Common by Auto for autodetect
-string(REPLACE ";" " " CUDA_ARCH_FLAGS "${CUDA_ARCH_FLAGS}")
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_ARCH_FLAGS}")
+#include(FindCUDA)
+#cuda_select_nvcc_arch_flags(CUDA_ARCH_FLAGS Common) # Change Common by Auto for autodetect
+#string(REPLACE ";" " " CUDA_ARCH_FLAGS "${CUDA_ARCH_FLAGS}")
+#set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_ARCH_FLAGS}")
 
 set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -D_FORCE_INLINES")
 # set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -lineinfo")
@@ -17,6 +17,8 @@ set(CMAKE_CUDA_FLAGS  "${CMAKE_CUDA_FLAGS} -D_FORCE_INLINES")
 add_library(gpuRIRcu STATIC
     src/gpuRIR_cuda.cu
 )
+
+set_property(TARGET gpuRIRcu PROPERTY CUDA_ARCHITECTURES all-major)
 
 set_target_properties(gpuRIRcu PROPERTIES 
     POSITION_INDEPENDENT_CODE ON
