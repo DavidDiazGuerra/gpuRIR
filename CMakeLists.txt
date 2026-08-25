@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(gpuRIR LANGUAGES CXX CUDA)
-find_package(CUDA)
+find_package(CUDAToolkit REQUIRED)
 
 # Select several CUDA architectures
 #include(FindCUDA)
@@ -49,7 +49,11 @@ else()
     message(WARNING "IPO is not supported: ${output}")
 endif()
 
-target_link_libraries(gpuRIR_bind PRIVATE ${CUDA_curand_LIBRARY})
-target_link_libraries(gpuRIR_bind PRIVATE ${CUDA_CUFFT_LIBRARIES})
-target_link_libraries(gpuRIR_bind PRIVATE gpuRIRcu)
-target_link_libraries(gpuRIR_bind PRIVATE pybind11::module)
+target_link_libraries(gpuRIRcu PUBLIC
+    CUDA::cufft
+    CUDA::curand
+)
+target_link_libraries(gpuRIR_bind PRIVATE
+    gpuRIRcu
+    pybind11::module
+)
