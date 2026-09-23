@@ -4,11 +4,10 @@ from __future__ import division
 
 import numpy as np
 from scipy.optimize import minimize
-from scipy.signal import convolve
 
 from gpuRIR_bind import gpuRIR_bind
 
-__all__ = ["polar_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activate_mixed_precision", "activate_lut"]
+__all__ = ["polar_patterns", "beta_SabineEstimation", "att2t_SabineEstimator", "t2n", "simulateRIR", "simulateTrajectory", "activateMixedPrecision", "activateLUT"]
 
 polar_patterns =	{
   "omni": 0,
