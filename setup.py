@@ -45,11 +45,21 @@ class CMakeBuild(build_ext):
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
 
+        # A generator given in CMAKE_ARGS or CMAKE_GENERATOR (e.g. Ninja, which
+        # the HIP build needs on Windows) does not accept the Visual Studio options.
+        generator = os.environ.get('CMAKE_GENERATOR', '')
+        for i, arg in enumerate(cmake_args):
+            if arg.startswith('-G'):
+                generator = arg[2:] or cmake_args[i + 1]
+
         if platform.system() == "Windows":
             cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
-            if sys.maxsize > 2**32:
-                cmake_args += ['-A', 'x64']
-            build_args += ['--', '/m']
+            if not generator or generator.startswith('Visual Studio'):
+                if sys.maxsize > 2**32:
+                    cmake_args += ['-A', 'x64']
+                build_args += ['--', '/m']
+            elif 'Multi-Config' not in generator:
+                cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j2']
