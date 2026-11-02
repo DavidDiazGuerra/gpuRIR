@@ -33,7 +33,7 @@
 ## Installation
 You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR/zipball/master`. You can also clone or download our repository and run `pip install gpuRIR/`.
 
-To build for AMD GPUs with ROCm, pass the HIP options to CMake through `CMAKE_ARGS`, for example `CMAKE_ARGS="-DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx942" pip install gpuRIR/`. If `CMAKE_HIP_ARCHITECTURES` is omitted, the architecture of the GPUs in the build machine is detected automatically. On Windows, also select the Ninja generator and the Clang compilers shipped with ROCm, for example `CMAKE_ARGS="-G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_HIP_COMPILER=clang++ -DCMAKE_PREFIX_PATH=<ROCm path> -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1151"`.
+To build for AMD GPUs with ROCm, pass the HIP options to CMake through `CMAKE_ARGS`, for example `CMAKE_ARGS="-DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx942" pip install gpuRIR/`. If `CMAKE_HIP_ARCHITECTURES` is omitted, the architecture of the GPUs in the build machine is detected automatically. On Windows, also select the Ninja generator and the Clang compilers shipped with ROCm, for example `CMAKE_ARGS="-G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_HIP_COMPILER=clang++ -DCMAKE_PREFIX_PATH=<ROCm path> -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1151"`.
 
 
 ## License
