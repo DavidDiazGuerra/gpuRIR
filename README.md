@@ -21,7 +21,7 @@
 
 * **OS**: It has been tested on GNU/Linux systems (Ubuntu and centOS) and Windows 10. Please, let me know if you successfully [install it on Mac OSX systems](https://github.com/DavidDiazGuerra/gpuRIR/issues/3).
 
-* **Compilers**: To install the package you will need the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (it has been tested with the release 8.0 and 10.0 but it should work fine with any version that includes cuRAND) and a C++11 compiler, such as [GCC](https://gcc.gnu.org/) or [MSVC++](https://visualstudio.microsoft.com).
+* **Compilers**: To install the package you will need the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (it has been tested with the release 8.0 and 10.0 but it should work fine with any version that includes cuRAND) and a C++11 compiler, such as [GCC](https://gcc.gnu.org/) or [MSVC++](https://visualstudio.microsoft.com). AMD GPUs are supported through [ROCm](https://rocm.docs.amd.com) instead, which must include hipFFT and hipRAND.
 
 * **CMake**: Finally, you will need, at least, the version 3.23 of [CMake](https://cmake.org/).  You can easily get it by `pip install cmake`.
 
@@ -32,6 +32,8 @@
 
 ## Installation
 You can use `pip` to install **gpuRIR** from our repository through `pip install  https://github.com/DavidDiazGuerra/gpuRIR/zipball/master`. You can also clone or download our repository and run `pip install gpuRIR/`.
+
+To build for AMD GPUs with ROCm, pass the HIP options to CMake through `CMAKE_ARGS`, for example `CMAKE_ARGS="-DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx942" pip install gpuRIR/`. If `CMAKE_HIP_ARCHITECTURES` is omitted, the architecture of the GPUs in the build machine is detected automatically. On Windows, also select the Ninja generator and the Clang compilers shipped with ROCm, for example `CMAKE_ARGS="-G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_HIP_COMPILER=clang++ -DCMAKE_PREFIX_PATH=<ROCm path> -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1151"`.
 
 
 ## License

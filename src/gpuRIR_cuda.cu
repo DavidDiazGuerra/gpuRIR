@@ -2,17 +2,15 @@
 #include <iostream>
 #include <stdio.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <curand.h>
-#include <cufft.h>
-#include <cufftXt.h>
-#include <cuda_fp16.h>
+// CUDA headers and their cuFFT/cuRAND swaps are pulled in by this shim.
+// On NVIDIA it includes the original CUDA headers unchanged; on AMD it
+// includes the HIP runtime, hipFFT and hipRAND and aliases the symbols.
+#include "cuda_to_hip.h"
 
 #include <vector>
 #include "gpuRIR_cuda.h"
 
-#if CUDART_VERSION < 9000
+#if !defined(USE_HIP) && CUDART_VERSION < 9000
 #define __h2div h2div
 #endif
 
@@ -44,7 +42,7 @@ static const int nThreadsConv_x = 256;
 static const int nThreadsConv_y = 1;
 static const int nThreadsConv_z = 1;
 
-#if __CUDA_ARCH__ >= 530
+#if __CUDA_ARCH__ >= 530 || defined(__HIP_DEVICE_COMPILE__)
 #define h2zeros __float2half2_rn(0.0)
 #define h2ones __float2half2_rn(1.0)
 #define h2pi __float2half2_rn(PI)
@@ -166,7 +164,7 @@ __device__ __forceinline__ cufftComplex ComplexMul(cufftComplex a, cufftComplex 
 /* Mixed precision auxiliar device functions */
 /*********************************************/
 
-#if __CUDA_ARCH__ >= 530
+#if __CUDA_ARCH__ >= 530 || defined(__HIP_DEVICE_COMPILE__)
 
 __device__ __forceinline__ half2 h2abs(half2 x) {
 	uint32_t i = *reinterpret_cast<uint32_t*>(&x) & 0x7FFF7FFF;
@@ -233,9 +231,31 @@ __device__ __forceinline__ half2 image_sample_mp(half2 amp, float tau, float t1,
 /* Lookup table auxiliar device functions */
 /******************************************/
 
-__device__ __forceinline__ float image_sample_lut(float amp, float tau, float t, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+#if defined(USE_HIP)
+// The HIP texture API is unavailable on some AMD GPUs (gfx94x and newer), so
+// the LUT lives in a plain device buffer.
+typedef const float* sinc_lut_t;
+#else
+typedef cudaTextureObject_t sinc_lut_t;
+#endif
+
+__device__ __forceinline__ float image_sample_lut(float amp, float tau, float t, int Tw_2, sinc_lut_t sinc_lut, float lut_center) {
 	float t_tau = t - tau;
+#if defined(USE_HIP)
+	if (!(abs(t_tau) < Tw_2)) return 0.0f;
+	float coord = __fmaf_rz(t_tau, lut_oversamp, lut_center);
+	// Replicate CUDA's hardware linear filter in software using the
+	// unnormalized -0.5 texel-center convention: a coordinate c blends
+	// texels floor(c-0.5) and floor(c-0.5)+1 with weight frac(c-0.5).
+	// The buffer carries a trailing zero standing in for the border texel.
+	float c = coord - 0.5f;
+	float i0 = floorf(c);
+	float w = c - i0;
+	int i = (int)i0;
+	return amp * ((1.0f - w) * sinc_lut[i] + w * sinc_lut[i + 1]);
+#else
 	return (abs(t_tau)<Tw_2)? amp * tex1D<float>(sinc_lut, __fmaf_rz(t_tau,lut_oversamp,lut_center)) : 0.0f;
+#endif
 }
 
 /***********/
@@ -485,13 +505,13 @@ __global__ void complexPointwiseMulAndScale(cufftComplex *signal_segments, cufft
 /* Mixed precision KERNELS */
 /***************************/
 
-#if CUDART_VERSION < 9020
+#if !defined(USE_HIP) && CUDART_VERSION < 9020
 __global__ void generateRIR_mp_kernel(half2* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, float Fs, float Tw_2, float Tw_inv) {
 	half2 h2Tw_inv = __float2half2_rn(Tw_inv);
 #else 
 __global__ void generateRIR_mp_kernel(half2* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, float Fs, float Tw_2, half2 h2Tw_inv) {
 #endif
-	#if __CUDA_ARCH__ >= 530
+	#if __CUDA_ARCH__ >= 530 || defined(__HIP_DEVICE_COMPILE__)
 		int t = blockIdx.x * blockDim.x + threadIdx.x;
 		int m = blockIdx.y * blockDim.y + threadIdx.y;
 		int n_ini = blockIdx.z * ini_red;
@@ -514,7 +534,7 @@ __global__ void generateRIR_mp_kernel(half2* initialRIR, float* amp, float* tau,
 
 __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, int M, int T, int N, int intRIR_N) {
 	extern __shared__ half2 sdata_mp[];
-	#if __CUDA_ARCH__ >= 530
+	#if __CUDA_ARCH__ >= 530 || defined(__HIP_DEVICE_COMPILE__)
 		int tid = threadIdx.x;
 		int n = blockIdx.x*(blockDim.x*2) + threadIdx.x;
 		int t = blockIdx.y;
@@ -539,7 +559,7 @@ __global__ void reduceRIR_mp_kernel(half2* initialRIR, half2* intermediateRIR, i
 }
 
 __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, float* floatRIR, int M, int T) {
-	#if __CUDA_ARCH__ >= 530
+	#if __CUDA_ARCH__ >= 530 || defined(__HIP_DEVICE_COMPILE__)
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -556,7 +576,7 @@ __global__ void h2RIR_to_floatRIR_kernel(half2* h2RIR, float* floatRIR, int M, i
 /* Lookup table KERNELS */
 /************************/
 
-__global__ void generateRIR_kernel_lut(float* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, int Tw_2, cudaTextureObject_t sinc_lut, float lut_center) {
+__global__ void generateRIR_kernel_lut(float* initialRIR, float* amp, float* tau, int T, int M, int N, int iniRIR_N, int ini_red, int Tw_2, sinc_lut_t sinc_lut, float lut_center) {
 	int t = blockIdx.x * blockDim.x + threadIdx.x;
 	int m = blockIdx.y * blockDim.y + threadIdx.y;
 	int n_ini = blockIdx.z * ini_red;
@@ -575,7 +595,11 @@ __global__ void generateRIR_kernel_lut(float* initialRIR, float* amp, float* tau
 /* Auxiliar host functions */
 /***************************/
 
+#if defined(USE_HIP)
+float* create_sinc_texture_lut(int Tw, int lut_len) {
+#else
 cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int lut_len) {
+#endif
 	// Create lut in host memory
 	int lut_center = lut_len / 2;
 	float* sinc_lut_host = (float*)malloc(sizeof(float) * lut_len);
@@ -588,6 +612,14 @@ cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int 
 		sinc_lut_host[lut_center-i] = y;
 	}
 	
+#if defined(USE_HIP)
+	float* sinc_lut_dev;
+	gpuErrchk( cudaMalloc(&sinc_lut_dev, sizeof(float)*(lut_len+1)) );
+	gpuErrchk( cudaMemcpy(sinc_lut_dev, sinc_lut_host, sizeof(float)*lut_len, cudaMemcpyHostToDevice) );
+	gpuErrchk( cudaMemset(sinc_lut_dev + lut_len, 0, sizeof(float)) );
+	free(sinc_lut_host);
+	return sinc_lut_dev;
+#else
 	// Copy the lut to a device cudaArray
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaMallocArray(cuArrayLut, &channelDesc, lut_len);
@@ -613,6 +645,7 @@ cudaTextureObject_t create_sinc_texture_lut(cudaArray **cuArrayLut, int Tw, int 
     cudaCreateTextureObject(&texObjLut, &resDesc, &texDesc, NULL);
 	
 	return texObjLut;
+#endif
 }
 
 void gpuRIR_cuda::cuda_rirGenerator(float* rir, float* amp, float* tau, int M, int N, int T, float Fs) {
@@ -631,15 +664,23 @@ void gpuRIR_cuda::cuda_rirGenerator(float* rir, float* amp, float* tau, int M, i
 	if (lookup_table) {
 		int lut_len = Tw * lut_oversamp;
 		lut_len += ((lut_len%2)? 0 : 1); // Must be odd
+#if defined(USE_HIP)
+		float* sinc_lut = create_sinc_texture_lut(Tw, lut_len);
+#else
 		cudaArray* cuArrayLut;
 		cudaTextureObject_t sinc_lut = create_sinc_texture_lut(&cuArrayLut, Tw, lut_len);
+#endif
 		
 		generateRIR_kernel_lut<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw/2, sinc_lut, lut_len/2+0.5 );
 		gpuErrchk( cudaDeviceSynchronize() );
 		gpuErrchk( cudaPeekAtLastError() );
 		
+#if defined(USE_HIP)
+		gpuErrchk( cudaFree(sinc_lut) );
+#else
 		cudaDestroyTextureObject(sinc_lut);
 		cudaFreeArray(cuArrayLut);
+#endif
 	} else {
 		generateRIR_kernel<<<numBlocksIni, threadsPerBlockIni>>>( initialRIR, amp, tau, T, M, N, iniRIR_N, initialReduction, Tw );
 		gpuErrchk( cudaDeviceSynchronize() );
@@ -686,7 +727,7 @@ void cuda_rirGenerator_mp(float* rir, float* amp, float* tau, int M, int N, int 
 		gpuErrchk( cudaMalloc(&initialRIR, M*(T/2)*iniRIR_N*sizeof(half2)) );
 
 		float Tw_2 = 8e-3f * Fs / 2;
-		#if CUDART_VERSION < 9020
+		#if !defined(USE_HIP) && CUDART_VERSION < 9020
 			// For CUDA versions older than 9.2 it is nos possible to call from host code __float2half2_rn,
 			// but doing it in the kernel is slower
 			float Tw_inv = 1.0f / (8e-3f * Fs);
